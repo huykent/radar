@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, RedirectResponse
 import csv
 import io
 from fastapi.templating import Jinja2Templates
@@ -161,13 +161,74 @@ async def verify_api_key(request: Request) -> None:
 
 
 # ── Routes ────────────────────────────────────────────────────────
+
+# Login page HTML (inline to avoid extra template file)
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🔐 Radar Login</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head><body class="bg-gray-950 flex items-center justify-center min-h-screen">
+<div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+  <div class="text-center mb-6"><span class="text-4xl">📡</span>
+    <h1 class="text-xl font-bold text-white mt-2">Livestream Radar</h1>
+    <p class="text-xs text-gray-500 mt-1">Nhập mật khẩu để truy cập Dashboard</p>
+  </div>
+  {error}
+  <form method="POST" action="/login">
+    <input name="password" type="password" placeholder="Mật khẩu…"
+      class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm mb-4 focus:outline-none focus:border-purple-500" autofocus>
+    <button type="submit"
+      class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors">
+      🔓 Đăng nhập
+    </button>
+  </form>
+</div></body></html>"""
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    return HTMLResponse(LOGIN_HTML.format(error=""))
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(request: Request):
+    form = await request.form()
+    password = form.get("password", "")
+    server_key = await _get_api_key()
+
+    if not server_key or secrets.compare_digest(password, server_key):
+        # Set session cookie
+        import hashlib
+        token = hashlib.sha256((server_key or "open").encode()).hexdigest()[:32]
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie("radar_session", token, max_age=86400, httponly=True, samesite="lax")
+        return response
+    else:
+        error_html = '<p class="text-red-400 text-xs text-center mb-4">❌ Sai mật khẩu</p>'
+        return HTMLResponse(LOGIN_HTML.format(error=error_html))
+
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("radar_session")
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Serve the Promax Radar Dashboard."""
-    api_key = await _get_api_key()
+    """Serve the Promax Radar Dashboard (protected by login)."""
+    server_key = await _get_api_key()
+    if server_key:
+        import hashlib
+        expected = hashlib.sha256(server_key.encode()).hexdigest()[:32]
+        session = request.cookies.get("radar_session", "")
+        if session != expected:
+            return RedirectResponse(url="/login", status_code=303)
+    api_key = server_key or ""
     return templates.TemplateResponse(
         request=request, name="index.html",
-        context={"radar_api_key": api_key or ""}
+        context={"radar_api_key": api_key}
     )
 
 
