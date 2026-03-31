@@ -194,12 +194,15 @@ async def login_page():
 async def login_submit(request: Request):
     form = await request.form()
     password = form.get("password", "")
+    settings = await get_settings()
+    # Check dashboard_password first, then fall back to radar_api_key
+    dash_pass = settings.get("dashboard_password", "")
     server_key = await _get_api_key()
+    valid_pass = dash_pass or server_key
 
-    if not server_key or secrets.compare_digest(password, server_key):
-        # Set session cookie
+    if not valid_pass or secrets.compare_digest(password, valid_pass):
         import hashlib
-        token = hashlib.sha256((server_key or "open").encode()).hexdigest()[:32]
+        token = hashlib.sha256((valid_pass or "open").encode()).hexdigest()[:32]
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie("radar_session", token, max_age=86400, httponly=True, samesite="lax")
         return response
@@ -219,9 +222,12 @@ async def logout():
 async def index(request: Request):
     """Serve the Promax Radar Dashboard (protected by login)."""
     import hashlib
+    settings = await get_settings()
+    dash_pass = settings.get("dashboard_password", "")
     server_key = await _get_api_key()
-    if server_key:
-        expected = hashlib.sha256(server_key.encode()).hexdigest()[:32]
+    valid_pass = dash_pass or server_key
+    if valid_pass:
+        expected = hashlib.sha256(valid_pass.encode()).hexdigest()[:32]
         session = request.cookies.get("radar_session", "")
         if session != expected:
             return RedirectResponse(url="/login", status_code=303)
@@ -490,6 +496,8 @@ class SettingsPayload(BaseModel):
     selected_tags: str | None = None  # JSON array string
     pancake_chat_page_id: str | None = None
     pancake_chat_token: str | None = None
+    dashboard_password: str | None = None
+    radar_api_key: str | None = None
 
 
 @app.get("/api/settings", dependencies=[Depends(verify_api_key)])
@@ -521,6 +529,23 @@ async def api_get_settings():
         settings["pancake_chat_token_set"] = False
     settings.pop("pancake_chat_token", None)
 
+    # Mask dashboard password
+    if "dashboard_password" in settings and settings["dashboard_password"]:
+        settings["dashboard_password_set"] = True
+    else:
+        settings["dashboard_password_set"] = False
+    settings.pop("dashboard_password", None)
+
+    # Mask radar API key
+    if "radar_api_key" in settings and settings["radar_api_key"]:
+        rk = settings["radar_api_key"]
+        settings["radar_api_key_masked"] = rk[:4] + "****" + rk[-4:] if len(rk) > 8 else "****"
+        settings["radar_api_key_set"] = True
+    else:
+        settings["radar_api_key_masked"] = ""
+        settings["radar_api_key_set"] = False
+    settings.pop("radar_api_key", None)
+
     return JSONResponse(settings)
 
 
@@ -540,6 +565,10 @@ async def api_save_settings(payload: SettingsPayload):
         data["sync_interval"] = payload.sync_interval
     if payload.selected_tags is not None:
         data["selected_tags"] = payload.selected_tags
+    if payload.dashboard_password is not None and payload.dashboard_password != "":
+        data["dashboard_password"] = payload.dashboard_password
+    if payload.radar_api_key is not None and payload.radar_api_key != "":
+        data["radar_api_key"] = payload.radar_api_key
     
     if data:
         await save_settings(data)

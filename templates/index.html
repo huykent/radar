@@ -552,6 +552,25 @@
         </div>
       </div>
 
+      <!-- ── Security ─────────────────────── -->
+      <div class="mt-5 mb-4 pt-4 border-t border-gray-800/50">
+        <h4 class="text-xs font-bold text-red-400 mb-3">🔐 Bảo mật</h4>
+        <div class="mb-3">
+          <label class="block text-xs text-gray-400 font-medium mb-1.5">Mật khẩu Dashboard</label>
+          <input id="cfg-dash-pass" type="password" class="input-field" placeholder="Đặt mật khẩu đăng nhập…">
+          <p id="cfg-dash-pass-status" class="text-[10px] text-gray-600 mt-1"></p>
+        </div>
+        <div class="mb-3">
+          <label class="block text-xs text-gray-400 font-medium mb-1.5">Radar API Key (cho Extension)</label>
+          <div class="relative">
+            <input id="cfg-radar-key" type="password" class="input-field pr-10" placeholder="Nhập API key…">
+            <button id="btn-toggle-radar-key" type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm p-1"
+              title="Hiện/Ẩn">👁️</button>
+          </div>
+          <p id="cfg-radar-key-status" class="text-[10px] text-gray-600 mt-1"></p>
+        </div>
+      </div>
       <!-- Sync Interval -->
       <div class="mb-5">
         <label class="block text-xs text-gray-400 font-medium mb-1.5">Khoảng cách đồng bộ (phút)</label>
@@ -862,6 +881,10 @@
     const $chatPageId = document.getElementById('cfg-chat-page-id');
     const $chatToken = document.getElementById('cfg-chat-token');
     const $chatStatus = document.getElementById('cfg-chat-status');
+    const $dashPass = document.getElementById('cfg-dash-pass');
+    const $dashPassStatus = document.getElementById('cfg-dash-pass-status');
+    const $radarKey = document.getElementById('cfg-radar-key');
+    const $radarKeyStatus = document.getElementById('cfg-radar-key-status');
     const $syncDot = document.getElementById('sync-dot');
     const $syncText = document.getElementById('sync-text');
     const $syncCust = document.getElementById('sync-customers');
@@ -889,6 +912,10 @@
     // Toggle Chat token visibility
     document.getElementById('btn-toggle-chat-token').addEventListener('click', () => {
       $chatToken.type = $chatToken.type === 'password' ? 'text' : 'password';
+    });
+    // Toggle Radar API key visibility
+    document.getElementById('btn-toggle-radar-key').addEventListener('click', () => {
+      $radarKey.type = $radarKey.type === 'password' ? 'text' : 'password';
     });
 
     // Load settings from API
@@ -922,6 +949,29 @@
           $chatToken.placeholder = 'Nhập token…';
           $chatStatus.textContent = '⚠️ Chưa có token';
           $chatStatus.className = 'text-[10px] text-amber-500 mt-1';
+        }
+
+        // Security fields
+        $dashPass.value = '';
+        if (s.dashboard_password_set) {
+          $dashPass.placeholder = '••••••••';
+          $dashPassStatus.textContent = '✅ Mật khẩu đã được đặt';
+          $dashPassStatus.className = 'text-[10px] text-emerald-500 mt-1';
+        } else {
+          $dashPass.placeholder = 'Đặt mật khẩu đăng nhập…';
+          $dashPassStatus.textContent = '⚠️ Chưa đặt mật khẩu (dùng API key)';
+          $dashPassStatus.className = 'text-[10px] text-amber-500 mt-1';
+        }
+
+        $radarKey.value = '';
+        if (s.radar_api_key_set) {
+          $radarKey.placeholder = s.radar_api_key_masked || '••••••••';
+          $radarKeyStatus.textContent = '✅ API key đã được lưu';
+          $radarKeyStatus.className = 'text-[10px] text-emerald-500 mt-1';
+        } else {
+          $radarKey.placeholder = 'Nhập API key…';
+          $radarKeyStatus.textContent = '⚠️ Chưa có API key';
+          $radarKeyStatus.className = 'text-[10px] text-amber-500 mt-1';
         }
 
         // Parse selected tags
@@ -961,6 +1011,12 @@
         }
         if ($chatToken.value.trim()) {
           payload.pancake_chat_token = $chatToken.value.trim();
+        }
+        if ($dashPass.value.trim()) {
+          payload.dashboard_password = $dashPass.value.trim();
+        }
+        if ($radarKey.value.trim()) {
+          payload.radar_api_key = $radarKey.value.trim();
         }
 
         const r = await authFetch('/api/settings', {
