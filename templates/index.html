@@ -460,16 +460,16 @@
           <select id="session-select" class="session-select" title="Chọn phiên livestream">
             <option value="">📹 Tất cả phiên</option>
           </select>
-          <a href="#" id="btn-export-post" download="live_comments_post.csv" target="_blank"
+          <button id="btn-export-post"
             class="text-xs text-amber-400 hover:text-amber-300 transition-colors px-2 py-1 rounded hover:bg-amber-500/10 border border-amber-500/20 font-medium flex items-center gap-1"
-            title="Xuất CSV theo phiên đang chọn">
+            title="Xuất CSV theo phiên đang chọn" disabled style="opacity:0.4">
             📎 Xuất Phiên
-          </a>
-          <a href="/api/export/comments" download="live_comments_all.csv" target="_blank"
+          </button>
+          <button id="btn-export-all"
             class="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded hover:bg-emerald-500/10 border border-emerald-500/20 font-medium flex items-center gap-1"
             title="Tải tất cả bình luận từ trước đến nay">
             📊 Tất Cả
-          </a>
+          </button>
           <button id="btn-clear"
             class="text-xs text-gray-600 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-white/5"
             title="Xóa màn hình và bắt đầu Phiên mới">
@@ -814,19 +814,40 @@
 
     $sessionSelect.addEventListener('change', () => {
       const pid = $sessionSelect.value;
+      const btn = $exportPost;
       if (pid) {
-        $exportPost.href = `/api/export/comments?post_id=${encodeURIComponent(pid)}`;
-        $exportPost.style.opacity = '1';
-        $exportPost.style.pointerEvents = 'auto';
+        btn.disabled = false;
+        btn.style.opacity = '1';
       } else {
-        $exportPost.href = '#';
-        $exportPost.style.opacity = '0.4';
-        $exportPost.style.pointerEvents = 'none';
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
       }
     });
 
-    $exportPost.style.opacity = '0.4';
-    $exportPost.style.pointerEvents = 'none';
+    // Download helper with auth
+    async function downloadCSV(url, filename) {
+      try {
+        const r = await authFetch(url);
+        if (!r.ok) { alert('Export failed: ' + r.status); return; }
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) { alert('Export error: ' + e.message); }
+    }
+
+    $exportPost.addEventListener('click', () => {
+      const pid = $sessionSelect.value;
+      if (!pid) return;
+      downloadCSV(`/api/export/comments?post_id=${encodeURIComponent(pid)}`, `live_comments_${pid}.csv`);
+    });
+
+    document.getElementById('btn-export-all').addEventListener('click', () => {
+      downloadCSV('/api/export/comments', 'live_comments_all.csv');
+    });
+
     loadSessions();
     setInterval(loadSessions, 60000);
 
