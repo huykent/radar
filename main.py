@@ -264,6 +264,163 @@ async def api_debug_stats():
 
 
 # ═══════════════════════════════════════════════════════════════════
+# PANCAKE WEBHOOK — REAL-TIME DATA RECEIVER
+# ═══════════════════════════════════════════════════════════════════
+@app.post("/webhook/pancake")
+async def webhook_pancake(request: Request):
+    """
+    Receive real-time events from Pancake (orders, messages, customers).
+    Configure this URL in Pancake Settings → Webhooks.
+    URL: https://radar.kiwibebe.shop/webhook/pancake
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"status": "error", "detail": "Invalid JSON"}, status_code=400)
+
+    event_type = body.get("event") or body.get("type") or body.get("action") or "unknown"
+    logger.info("📩 Webhook received: %s", event_type)
+    logger.debug("Webhook payload: %s", json.dumps(body, ensure_ascii=False)[:500])
+
+    try:
+        # ── Order events ──────────────────────────────────
+        if event_type in ("order.created", "order.updated", "order_created", "order_updated", "new_order", "update_order"):
+            order = body.get("data") or body.get("order") or body
+            await _handle_webhook_order(order)
+
+        # ── Conversation / Message events ─────────────────
+        elif event_type in ("message.created", "new_message", "message_created", "conversation.updated"):
+            msg_data = body.get("data") or body.get("message") or body
+            await _handle_webhook_message(msg_data)
+
+        # ── Customer tag events ───────────────────────────
+        elif event_type in ("conversation.tag_added", "conversation.tag_removed", "tag_added", "tag_removed"):
+            tag_data = body.get("data") or body
+            await _handle_webhook_tag(tag_data, event_type)
+
+        # ── Customer update events ────────────────────────
+        elif event_type in ("customer.updated", "customer_updated"):
+            cust_data = body.get("data") or body.get("customer") or body
+            await _handle_webhook_customer(cust_data)
+
+        # ── Generic / unknown — log for analysis ──────────
+        else:
+            logger.info("📩 Unhandled webhook event '%s'. Keys: %s", event_type, list(body.keys()))
+
+    except Exception as exc:
+        logger.exception("Webhook processing error: %s", exc)
+
+    return JSONResponse({"status": "ok", "event": event_type})
+
+
+async def _handle_webhook_order(order: dict):
+    """Process a single order from webhook."""
+    from utils import normalize_phone
+    from tier import resolve_tier
+
+    phone_raw = order.get("bill_phone_number") or order.get("customer_phone") or ""
+    phone = normalize_phone(str(phone_raw))
+    if not phone or len(phone) < 10:
+        return
+
+    customer_name = order.get("bill_full_name") or order.get("customer_name") or ""
+    status = str(order.get("status", "")).lower().strip()
+    price = float(order.get("total_price", 0) or 0)
+
+    # Get existing profile or create new
+    profile = await get_profile(phone)
+    if profile:
+        total = profile["total_orders"] + 1
+        success = profile["success_orders"]
+        failed = profile["failed_orders"]
+        spent = profile["total_spent"]
+    else:
+        total = 1
+        success = 0
+        failed = 0
+        spent = 0.0
+
+    SUCCESS = {"success", "delivered", "done", "collected_money", "5", "6"}
+    FAILED = {"returned", "canceled", "failed", "customer_cancel", "3", "4"}
+
+    if status in SUCCESS:
+        success += 1
+        spent += price
+    elif status in FAILED:
+        failed += 1
+
+    tier_tag, priority_score = resolve_tier(
+        pancake_tags=profile.get("pancake_tags", []) if profile else [],
+        total=total, success=success, failed=failed, spent=spent,
+    )
+
+    await bulk_upsert_profiles([{
+        "phone": phone,
+        "total_orders": total,
+        "success_orders": success,
+        "failed_orders": failed,
+        "total_spent": spent,
+        "tier_tag": tier_tag,
+        "priority_score": priority_score,
+        "customer_name": customer_name,
+    }])
+
+    logger.info("📦 Webhook order: %s → %s (%s)", phone, tier_tag, status)
+
+
+async def _handle_webhook_message(msg_data: dict):
+    """Process incoming message — update customer last interaction."""
+    sender = msg_data.get("from") or msg_data.get("sender") or {}
+    sender_name = sender.get("name") or sender.get("full_name") or ""
+    sender_id = str(sender.get("id") or sender.get("psid") or "")
+
+    if sender_name and sender_id:
+        logger.info("💬 Webhook message from: %s (id: %s)", sender_name, sender_id)
+
+
+async def _handle_webhook_tag(tag_data: dict, event_type: str):
+    """Process tag added/removed on a conversation."""
+    from tier import resolve_tier
+
+    conversation_id = tag_data.get("conversation_id") or ""
+    tag_name = tag_data.get("tag_name") or tag_data.get("tag", {}).get("text") or ""
+    customer_name = tag_data.get("customer_name") or ""
+
+    if tag_name:
+        logger.info("🏷️ Webhook %s: '%s' on conversation %s (%s)",
+                     event_type, tag_name, conversation_id, customer_name)
+
+
+async def _handle_webhook_customer(cust_data: dict):
+    """Process customer profile update from Pancake."""
+    from utils import normalize_phone
+    from tier import resolve_tier
+
+    phone_raw = cust_data.get("phone_number") or cust_data.get("phone") or ""
+    phone = normalize_phone(str(phone_raw))
+    name = cust_data.get("name") or cust_data.get("full_name") or ""
+    fb_uid = str(cust_data.get("facebook_id") or cust_data.get("psid") or "")
+
+    if phone and len(phone) >= 10:
+        profile = await get_profile(phone)
+        if profile:
+            # Update name/uid if available
+            updates = {"phone": phone}
+            if name:
+                updates["customer_name"] = name
+            if fb_uid:
+                updates["fb_uid"] = fb_uid
+            updates["total_orders"] = profile["total_orders"]
+            updates["success_orders"] = profile["success_orders"]
+            updates["failed_orders"] = profile["failed_orders"]
+            updates["total_spent"] = profile["total_spent"]
+            updates["tier_tag"] = profile["tier_tag"]
+            updates["priority_score"] = profile["priority_score"]
+            await bulk_upsert_profiles([updates])
+            logger.info("👤 Webhook customer update: %s (%s)", name, phone)
+
+
+# ═══════════════════════════════════════════════════════════════════
 # SETTINGS API
 # ═══════════════════════════════════════════════════════════════════
 class SettingsPayload(BaseModel):
