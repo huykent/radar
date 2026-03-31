@@ -238,8 +238,9 @@ async def index(request: Request):
             return RedirectResponse(url="/login", status_code=303)
     api_key = server_key or ""
     return templates.TemplateResponse(
+        request=request,
         name="index.html",
-        context={"request": request, "radar_api_key": api_key},
+        context={"radar_api_key": api_key},
     )
 
 
