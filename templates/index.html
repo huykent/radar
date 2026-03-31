@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📡 Livestream Radar — Promax Dashboard</title>
+  <meta name="description" content="Real-time livestream customer profiling command center" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      background: #0f172a;
+    }
+
+    /* ── Glassmorphism panels ─────────────────────────────────── */
+    .glass {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+    }
+
+    /* ── Neon glow keyframes ─────────────────────────────────── */
+    @keyframes neon-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 8px rgba(250, 204, 21, 0.3), 0 0 20px rgba(250, 204, 21, 0.15);
+      }
+
+      50% {
+        box-shadow: 0 0 16px rgba(250, 204, 21, 0.6), 0 0 40px rgba(250, 204, 21, 0.3);
+      }
+    }
+
+    .neon-gold {
+      animation: neon-pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Slide-down entrance ─────────────────────────────────── */
+    .card-enter {
+      opacity: 0;
+      transform: translateY(-24px) scale(0.97);
+    }
+
+    .card-enter-active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transition: all 500ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ── Status dot animation ────────────────────────────────── */
+    @keyframes live-blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .live-dot {
+      animation: live-blink 1.4s ease-in-out infinite;
+    }
+
+    /* ── Scrollbar styling ───────────────────────────────────── */
+    #comment-feed::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #comment-feed::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #comment-feed::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    /* ── Shimmer skeleton ────────────────────────────────────── */
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+
+      100% {
+        background-position: 200% 0;
+      }
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+
+    /* ── Settings panel ──────────────────────────────────────── */
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 5vh;
+    }
+
+    .settings-overlay.open {
+      display: flex;
+    }
+
+    .settings-panel {
+      width: 95%;
+      max-width: 520px;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      transform: translateY(-10px);
+      opacity: 0;
+      transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
+    }
+
+    .settings-overlay.open .settings-panel {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 200ms, box-shadow 200ms;
+    }
+
+    .input-field:focus {
+      border-color: rgba(139, 92, 246, 0.5);
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+    }
+
+    .input-field::placeholder {
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-primary {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: transform 150ms, box-shadow 200ms;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: background 200ms, color 200ms;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+    }
+
+    .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── Tag checkboxes ──────────────────────────────────────── */
+    .tag-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: background 200ms, border-color 200ms;
+    }
+
+    .tag-checkbox:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .tag-checkbox.selected {
+      background: rgba(139, 92, 246, 0.12);
+      border-color: rgba(139, 92, 246, 0.3);
+    }
+
+    .tag-checkbox input {
+      accent-color: #7c3aed;
+    }
+
+    /* ── Settings panel scrollbar ────────────────────────────── */
+    .settings-panel::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .settings-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .settings-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+    }
+
+    /* ── Gear button ─────────────────────────────────────────── */
+    .gear-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255, 255, 255, 0.06);
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: background 200ms, color 200ms, transform 300ms;
+    }
+
+    .gear-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      transform: rotate(90deg);
+    }
+
+    /* ── Match method badge ───────────────────────────────────── */
+    .match-badge {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .match-badge--uid {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+    }
+
+    .match-badge--phone {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+
+    .match-badge--name {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+    }
+
+    .match-badge--on_demand {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+    }
+
+    .match-badge--chat {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+    }
+
+    /* ── Filter bar ──────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 150ms;
+      white-space: nowrap;
+    }
+
+    .filter-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+    }
+
+    .filter-btn.active {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(139, 92, 246, 0.4);
+      color: #c084fc;
+    }
+
+    .filter-btn.hide-new {
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .filter-btn.hide-new.active {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .search-input {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      outline: none;
+      width: 160px;
+      transition: border-color 200ms, width 200ms;
+    }
+
+    .search-input:focus {
+      border-color: rgba(139, 92, 246, 0.4);
+      width: 200px;
+    }
+
+    .search-input::placeholder {
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    .session-select {
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      outline: none;
+      cursor: pointer;
+      max-width: 200px;
+    }
+
+    .session-select:focus {
+      border-color: rgba(139, 92, 246, 0.4);
+    }
+  </style>
+</head>
+
+<body class="h-full text-gray-100 antialiased">
+  <div class="min-h-full flex flex-col">
+
+    <!-- ═══════════════════ HEADER ═══════════════════ -->
+    <header class="glass mx-4 mt-4 px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">📡</span>
+        <div>
+          <h1
+            class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            Livestream Radar
+          </h1>
+          <p class="text-xs text-gray-500 font-medium">Promax Command Center</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <!-- Live indicator -->
+        <div id="ws-status" class="flex items-center gap-2 text-sm font-semibold">
+          <span class="live-dot w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+          <span class="text-gray-400">Connecting…</span>
+        </div>
+        <!-- Settings gear -->
+        <button id="btn-settings" class="gear-btn" title="Cài đặt Pancake">⚙️</button>
+      </div>
+    </header>
+
+    <!-- ═══════════════════ STATS BAR ═══════════════════ -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mx-4 mt-3">
+      <div class="glass px-4 py-3 text-center">
+        <p class="text-2xl font-bold text-white" id="stat-total">0</p>
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mt-0.5">Comments</p>
+      </div>
+      <div class="glass px-4 py-3 text-center">
+        <p class="text-2xl font-bold text-yellow-300" id="stat-vip">0</p>
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mt-0.5">💎 VIP</p>
+      </div>
+      <div class="glass px-4 py-3 text-center">
+        <p class="text-2xl font-bold text-emerald-400" id="stat-returning">0</p>
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mt-0.5">🟢 Quen</p>
+      </div>
+      <div class="glass px-4 py-3 text-center">
+        <p class="text-2xl font-bold text-red-400" id="stat-bomber">0</p>
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mt-0.5">☠️ Bom</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ COMMENT FEED ═══════════════════ -->
+    <main class="flex-1 mx-4 mt-3 mb-4 glass p-4 overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Live Feed</h2>
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Filter buttons -->
+          <div class="filter-bar" id="filter-bar">
+            <input type="text" class="search-input" id="search-input" placeholder="🔍 Tìm tên / SĐT…">
+            <button class="filter-btn active" data-tier="all">Tất cả</button>
+            <button class="filter-btn" data-tier="vip">💎 VIP</button>
+            <button class="filter-btn" data-tier="quen">🟢 Quen</button>
+            <button class="filter-btn" data-tier="bom">☠️ Bom</button>
+            <button class="filter-btn" data-tier="dao">🟡 Dạo</button>
+            <button class="filter-btn hide-new" data-tier="hide-new">👁️ Ẩn Mới</button>
+          </div>
+          <a href="#" id="btn-export-session" download="live_comments_session.csv" target="_blank"
+            class="text-xs text-blue-400 hover:text-blue-300 transition-colors px-2 py-1 rounded hover:bg-blue-500/10 border border-blue-500/20 font-medium flex items-center gap-1"
+            title="Chỉ tải các bình luận hiện trên màn hình">
+            📊 Phiên Này
+          </a>
+          <select id="session-select" class="session-select" title="Chọn phiên livestream">
+            <option value="">📹 Tất cả phiên</option>
+          </select>
+          <a href="#" id="btn-export-post" download="live_comments_post.csv" target="_blank"
+            class="text-xs text-amber-400 hover:text-amber-300 transition-colors px-2 py-1 rounded hover:bg-amber-500/10 border border-amber-500/20 font-medium flex items-center gap-1"
+            title="Xuất CSV theo phiên đang chọn">
+            📎 Xuất Phiên
+          </a>
+          <a href="/api/export/comments" download="live_comments_all.csv" target="_blank"
+            class="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded hover:bg-emerald-500/10 border border-emerald-500/20 font-medium flex items-center gap-1"
+            title="Tải tất cả bình luận từ trước đến nay">
+            📊 Tất Cả
+          </a>
+          <button id="btn-clear"
+            class="text-xs text-gray-600 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-white/5"
+            title="Xóa màn hình và bắt đầu Phiên mới">
+            Xóa màn hình
+          </button>
+        </div>
+      </div>
+
+      <div id="comment-feed" class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <!-- Cards injected here by JS -->
+        <div id="empty-state" class="flex flex-col items-center justify-center h-full text-gray-600">
+          <span class="text-5xl mb-3">📡</span>
+          <p class="text-sm">Waiting for live comments…</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══════════════════ SETTINGS OVERLAY ═══════════════════ -->
+  <div id="settings-overlay" class="settings-overlay">
+    <div class="settings-panel">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🥞</span>
+          <div>
+            <h2 class="text-lg font-bold text-white">Pancake POS</h2>
+            <p class="text-xs text-gray-500">Cấu hình đồng bộ khách hàng</p>
+          </div>
+        </div>
+        <button id="btn-settings-close" class="gear-btn" style="font-size:16px">✕</button>
+      </div>
+
+      <!-- Sync Status -->
+      <div id="sync-status"
+        class="flex items-center gap-3 mb-6 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <div id="sync-dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+            <span id="sync-text" class="text-xs text-gray-500">Chưa đồng bộ</span>
+          </div>
+          <p id="sync-customers" class="text-xs text-gray-600 mt-1"></p>
+        </div>
+      </div>
+
+      <!-- Shop ID -->
+      <div class="mb-4">
+        <label class="block text-xs text-gray-400 font-medium mb-1.5">Shop ID</label>
+        <input id="cfg-shop-id" type="text" class="input-field" placeholder="VD: 1942356641">
+      </div>
+
+      <!-- API Key -->
+      <div class="mb-4">
+        <label class="block text-xs text-gray-400 font-medium mb-1.5">API Key</label>
+        <div class="relative">
+          <input id="cfg-api-key" type="password" class="input-field pr-10" placeholder="Nhập API key…">
+          <button id="btn-toggle-key" type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm p-1"
+            title="Hiện/Ẩn">👁️</button>
+        </div>
+        <p id="cfg-key-status" class="text-[10px] text-gray-600 mt-1"></p>
+      </div>
+
+      <!-- Sync Interval -->
+      <div class="mb-5">
+        <label class="block text-xs text-gray-400 font-medium mb-1.5">Khoảng cách đồng bộ (phút)</label>
+        <select id="cfg-interval" class="input-field">
+          <option value="30">30 phút</option>
+          <option value="60" selected>60 phút (khuyến nghị)</option>
+          <option value="120">2 giờ</option>
+          <option value="360">6 giờ</option>
+        </select>
+      </div>
+
+      <!-- Tags Section -->
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs text-gray-400 font-medium">Tags khách hàng</label>
+          <button id="btn-load-tags"
+            class="text-[10px] text-purple-400 hover:text-purple-300 transition-colors cursor-pointer">
+            🔄 Tải tags từ Pancake
+          </button>
+        </div>
+        <div id="tag-container" class="space-y-2">
+          <p class="text-xs text-gray-600 italic">Nhấn "Tải tags" sau khi nhập API Key</p>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex items-center gap-3">
+        <button id="btn-save-settings" class="btn-primary flex-1">💾 Lưu cài đặt</button>
+        <button id="btn-sync-now" class="btn-secondary">🔄 Sync ngay</button>
+      </div>
+
+      <!-- Save feedback -->
+      <div id="save-feedback"
+        class="mt-3 text-center text-xs text-emerald-400 opacity-0 transition-opacity duration-300"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+  <script>
+    // ── State ────────────────────────────────────────────
+    const state = { total: 0, vip: 0, returning: 0, bomber: 0 };
+    const $feed = document.getElementById('comment-feed');
+    const $empty = document.getElementById('empty-state');
+    const $status = document.getElementById('ws-status');
+    const $total = document.getElementById('stat-total');
+    const $vip = document.getElementById('stat-vip');
+    const $return = document.getElementById('stat-returning');
+    const $bomber = document.getElementById('stat-bomber');
+
+    // ── Tier → CSS class map ─────────────────────────────
+    const TIER_STYLES = {
+      '💎 KHÁCH VIP': 'bg-yellow-500/10 border-l-4 border-yellow-400 neon-gold text-yellow-300 font-bold',
+      '🟢 KHÁCH QUEN': 'bg-emerald-500/10 border-l-4 border-emerald-500 text-emerald-400',
+      '⚪ KHÁCH MỚI': 'bg-white/5 backdrop-blur-md border-l-4 border-gray-500 text-gray-200',
+      '⚠️ KHÔNG CỌC': 'bg-amber-500/10 border-l-4 border-amber-500 text-amber-400',
+      '🟡 CHỐT DẠO': 'bg-orange-500/10 border-l-4 border-orange-500 text-orange-400 opacity-80',
+      '☠️ BOM HÀNG': 'bg-red-900/20 border-l-4 border-red-600 text-red-500 opacity-50',
+    };
+
+    // ── Currency formatter ───────────────────────────────
+    const fmtVND = (v) => {
+      if (v == null || v === 0) return '—';
+      return new Intl.NumberFormat('vi-VN').format(v) + ' ₫';
+    };
+
+    // ── Build comment card ───────────────────────────────
+    function createCard(msg) {
+      const tierClass = TIER_STYLES[msg.tier_tag] || TIER_STYLES['⚪ KHÁCH MỚI'];
+      const isLineThrough = msg.tier_tag === '☠️ BOM HÀNG' ? 'line-through' : '';
+
+      const card = document.createElement('div');
+      card.className = `card-enter rounded-xl px-4 py-3 ${tierClass} ${isLineThrough}`;
+
+      const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Match method badge
+      let matchHtml = '';
+      if (msg.match_method && msg.match_method !== 'none') {
+        const matchStyles = {
+          'fb_uid': { cls: 'match-badge--uid', label: 'FB UID' },
+          'phone': { cls: 'match-badge--phone', label: 'SĐT' },
+          'name': { cls: 'match-badge--name', label: 'Tên' },
+          'on_demand': { cls: 'match-badge--on_demand', label: '⚡ API' },
+          'chat': { cls: 'match-badge--chat', label: '💬 Chat' },
+        };
+        const ms = matchStyles[msg.match_method] || { cls: 'match-badge--name', label: msg.match_method };
+        matchHtml = `<span class="match-badge ${ms.cls}">${ms.label}</span>`;
+      }
+
+      // Pancake tags
+      let tagsHtml = '';
+      if (msg.pancake_tags && msg.pancake_tags.length > 0) {
+        tagsHtml = msg.pancake_tags.map(t =>
+          `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 whitespace-nowrap">🏷️ ${escHtml(t)}</span>`
+        ).join('');
+      }
+
+      card.setAttribute('data-tier', msg.tier_tag || '⚪ KHÁCH MỚI');
+      card.setAttribute('data-name', (msg.fb_name || '').toLowerCase());
+      card.setAttribute('data-phone', msg.phone || '');
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-sm truncate max-w-[180px]">${escHtml(msg.fb_name || 'Unknown')}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 font-medium whitespace-nowrap">${escHtml(msg.tier_tag || '⚪ KHÁCH MỚI')}</span>
+              ${matchHtml}
+              ${msg.phone ? `<span class="text-[10px] text-gray-500 font-mono">${escHtml(msg.phone)}</span>` : ''}
+              ${tagsHtml}
+            </div>
+            <p class="text-sm mt-1 text-gray-300/90 leading-relaxed ${isLineThrough}">${escHtml(msg.text || '')}</p>
+            ${msg.total_spent > 0 ? `
+            <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+              <span>Tổng chi: <b class="text-gray-300">${fmtVND(msg.total_spent)}</b></span>
+              <span>Đơn OK: <b class="text-emerald-400">${msg.success_orders ?? 0}</b></span>
+              <span>Đơn Fail: <b class="text-red-400">${msg.failed_orders ?? 0}</b></span>
+            </div>` : ''}
+          </div>
+          <span class="text-[10px] text-gray-600 whitespace-nowrap pt-0.5">${timeStr}</span>
+        </div>
+      `;
+
+      return card;
+    }
+
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ── Inject card with animation ───────────────────────
+    function addCard(msg) {
+      if ($empty) $empty.remove();
+
+      const card = createCard(msg);
+      $feed.prepend(card);
+
+      // Trigger reflow, then animate in
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => card.classList.replace('card-enter', 'card-enter-active'));
+      });
+
+      // Update stats
+      state.total++;
+      $total.textContent = state.total;
+
+      if (msg.tier_tag === '💎 KHÁCH VIP') { state.vip++; $vip.textContent = state.vip; }
+      if (msg.tier_tag === '🟢 KHÁCH QUEN') { state.returning++; $return.textContent = state.returning; }
+      if (msg.tier_tag === '☠️ BOM HÀNG') { state.bomber++; $bomber.textContent = state.bomber; }
+
+      // Cap DOM at 200 cards
+      while ($feed.children.length > 200) $feed.removeChild($feed.lastChild);
+    }
+
+    // ── Export Session ───────────────────────────────────
+    let sessionStartTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    document.getElementById('btn-export-session').addEventListener('click', (e) => {
+      e.currentTarget.href = `/api/export/comments?since=${encodeURIComponent(sessionStartTime)}`;
+    });
+
+    // ── Clear button ─────────────────────────────────────
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      $feed.innerHTML = '';
+      state.total = state.vip = state.returning = state.bomber = 0;
+      $total.textContent = $vip.textContent = $return.textContent = $bomber.textContent = '0';
+      sessionStartTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    });
+
+    // ── Filter logic ──────────────────────────────────────
+    let activeFilter = 'all';
+    let hideNew = false;
+    let searchQuery = '';
+
+    const TIER_FILTER_MAP = {
+      'vip': '💎 KHÁCH VIP',
+      'quen': '🟢 KHÁCH QUEN',
+      'bom': '☠️ BOM HÀNG',
+      'dao': '🟡 CHỐT DẠO',
+    };
+
+    document.getElementById('filter-bar').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      const tier = btn.dataset.tier;
+
+      if (tier === 'hide-new') {
+        hideNew = !hideNew;
+        btn.classList.toggle('active', hideNew);
+      } else {
+        activeFilter = tier;
+        document.querySelectorAll('#filter-bar .filter-btn:not(.hide-new)').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+      applyFilters();
+    });
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase().trim();
+      applyFilters();
+    });
+
+    function applyFilters() {
+      const cards = $feed.querySelectorAll('[data-tier]');
+      cards.forEach(card => {
+        const tier = card.getAttribute('data-tier');
+        const name = card.getAttribute('data-name') || '';
+        const phone = card.getAttribute('data-phone') || '';
+
+        let show = true;
+
+        // Tier filter
+        if (activeFilter !== 'all') {
+          const expectedTier = TIER_FILTER_MAP[activeFilter];
+          if (tier !== expectedTier) show = false;
+        }
+
+        // Hide new
+        if (hideNew && tier === '⚪ KHÁCH MỚI') show = false;
+
+        // Search filter
+        if (searchQuery && !name.includes(searchQuery) && !phone.includes(searchQuery)) show = false;
+
+        card.style.display = show ? '' : 'none';
+      });
+    }
+
+    // ── Session selector ─────────────────────────────────────
+    const $sessionSelect = document.getElementById('session-select');
+    const $exportPost = document.getElementById('btn-export-post');
+
+    async function loadSessions() {
+      try {
+        const r = await fetch('/api/sessions');
+        const d = await r.json();
+        if (d.status === 'ok' && d.sessions) {
+          const prevVal = $sessionSelect.value;
+          $sessionSelect.innerHTML = '<option value="">📹 Tất cả phiên</option>';
+          d.sessions.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.post_id;
+            const time = new Date(s.last_comment).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+            opt.textContent = `📹 ${s.post_id.substring(0, 12)}… (${s.comment_count} cmt, ${time})`;
+            $sessionSelect.appendChild(opt);
+          });
+          if (prevVal) $sessionSelect.value = prevVal;
+        }
+      } catch (e) { console.warn('Load sessions failed:', e); }
+    }
+
+    $sessionSelect.addEventListener('change', () => {
+      const pid = $sessionSelect.value;
+      if (pid) {
+        $exportPost.href = `/api/export/comments?post_id=${encodeURIComponent(pid)}`;
+        $exportPost.style.opacity = '1';
+        $exportPost.style.pointerEvents = 'auto';
+      } else {
+        $exportPost.href = '#';
+        $exportPost.style.opacity = '0.4';
+        $exportPost.style.pointerEvents = 'none';
+      }
+    });
+
+    $exportPost.style.opacity = '0.4';
+    $exportPost.style.pointerEvents = 'none';
+    loadSessions();
+    setInterval(loadSessions, 60000);
+
+    // ═══════════════════════════════════════════════════════
+    // SETTINGS PANEL
+    // ═══════════════════════════════════════════════════════
+    const $overlay = document.getElementById('settings-overlay');
+    const $shopId = document.getElementById('cfg-shop-id');
+    const $apiKey = document.getElementById('cfg-api-key');
+    const $interval = document.getElementById('cfg-interval');
+    const $keyStatus = document.getElementById('cfg-key-status');
+    const $syncDot = document.getElementById('sync-dot');
+    const $syncText = document.getElementById('sync-text');
+    const $syncCust = document.getElementById('sync-customers');
+    const $feedback = document.getElementById('save-feedback');
+    const $tagContainer = document.getElementById('tag-container');
+
+    let selectedTags = [];
+
+    // Toggle Settings
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      $overlay.classList.add('open');
+      loadSettings();
+    });
+    document.getElementById('btn-settings-close').addEventListener('click', () => {
+      $overlay.classList.remove('open');
+    });
+    $overlay.addEventListener('click', (e) => {
+      if (e.target === $overlay) $overlay.classList.remove('open');
+    });
+
+    // Toggle API key visibility
+    document.getElementById('btn-toggle-key').addEventListener('click', () => {
+      $apiKey.type = $apiKey.type === 'password' ? 'text' : 'password';
+    });
+
+    // Load settings from API
+    async function loadSettings() {
+      try {
+        const r = await fetch('/api/settings');
+        const s = await r.json();
+
+        $shopId.value = s.pancake_shop_id || '';
+        $interval.value = s.sync_interval || '60';
+
+        if (s.pancake_api_key_set) {
+          $apiKey.placeholder = s.pancake_api_key_masked || '••••••••';
+          $apiKey.value = '';
+          $keyStatus.textContent = '✅ API key đã được lưu';
+          $keyStatus.className = 'text-[10px] text-emerald-500 mt-1';
+        } else {
+          $apiKey.placeholder = 'Nhập API key…';
+          $keyStatus.textContent = '⚠️ Chưa có API key';
+          $keyStatus.className = 'text-[10px] text-amber-500 mt-1';
+        }
+
+        // Parse selected tags
+        try {
+          selectedTags = s.selected_tags ? JSON.parse(s.selected_tags) : [];
+        } catch { selectedTags = []; }
+
+        // Show sync info
+        if (s.last_sync) {
+          const d = new Date(s.last_sync);
+          $syncText.textContent = `Lần sync cuối: ${d.toLocaleString('vi-VN')}`;
+          $syncDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        }
+        if (s.last_sync_count) {
+          $syncCust.textContent = `📊 ${s.last_sync_count} khách hàng đã đồng bộ`;
+        }
+      } catch (e) {
+        console.error('Load settings failed:', e);
+      }
+    }
+
+    // Save settings
+    document.getElementById('btn-save-settings').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-save-settings');
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang lưu…';
+
+      try {
+        const payload = {
+          pancake_shop_id: $shopId.value.trim(),
+          sync_interval: $interval.value,
+          selected_tags: JSON.stringify(selectedTags),
+        };
+        if ($apiKey.value.trim()) {
+          payload.pancake_api_key = $apiKey.value.trim();
+        }
+
+        const r = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const d = await r.json();
+
+        showFeedback('✅ Đã lưu cài đặt thành công!');
+        $apiKey.value = '';
+        loadSettings();
+      } catch (e) {
+        showFeedback('❌ Lưu thất bại: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Lưu cài đặt';
+      }
+    });
+
+    // Sync Now
+    document.getElementById('btn-sync-now').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-sync-now');
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang sync…';
+      $syncDot.className = 'w-2 h-2 rounded-full bg-yellow-400 animate-pulse';
+      $syncText.textContent = 'Đang đồng bộ…';
+
+      try {
+        const r = await fetch('/api/settings/sync-now', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'ok') {
+          showFeedback(`✅ Đồng bộ thành công! ${d.profiles_synced} khách hàng`);
+          $syncDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          $syncText.textContent = `Lần sync cuối: vừa xong`;
+          $syncCust.textContent = `📊 ${d.profiles_synced} khách hàng đã đồng bộ`;
+        } else {
+          showFeedback('❌ Sync thất bại: ' + (d.detail || 'Unknown'));
+          $syncDot.className = 'w-2 h-2 rounded-full bg-red-500';
+          $syncText.textContent = 'Sync lỗi';
+        }
+      } catch (e) {
+        showFeedback('❌ Sync thất bại: ' + e.message);
+        $syncDot.className = 'w-2 h-2 rounded-full bg-red-500';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Sync ngay';
+      }
+    });
+
+    // Load Tags from Pancake
+    document.getElementById('btn-load-tags').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-load-tags');
+      btn.textContent = '⏳ Đang tải…';
+
+      try {
+        const r = await fetch('/api/settings/tags');
+        const d = await r.json();
+        if (d.status === 'ok' && d.tags) {
+          renderTags(d.tags);
+        } else {
+          $tagContainer.innerHTML = `<p class="text-xs text-red-400">${d.detail || 'Không tải được tags'}</p>`;
+        }
+      } catch (e) {
+        $tagContainer.innerHTML = `<p class="text-xs text-red-400">Lỗi: ${e.message}</p>`;
+      } finally {
+        btn.textContent = '🔄 Tải tags từ Pancake';
+      }
+    });
+
+    function renderTags(tags) {
+      if (!tags || tags.length === 0) {
+        $tagContainer.innerHTML = '<p class="text-xs text-gray-600 italic">Không có tags nào</p>';
+        return;
+      }
+      $tagContainer.innerHTML = '';
+      tags.forEach(tag => {
+        const tagName = typeof tag === 'string' ? tag : (tag.name || tag.tag_name || JSON.stringify(tag));
+        const isSelected = selectedTags.includes(tagName);
+        const label = document.createElement('label');
+        label.className = `tag-checkbox${isSelected ? ' selected' : ''}`;
+        label.innerHTML = `
+          <input type="checkbox" ${isSelected ? 'checked' : ''} value="${escHtml(tagName)}">
+          <span class="text-sm text-gray-300">${escHtml(tagName)}</span>
+        `;
+        const cb = label.querySelector('input');
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            if (!selectedTags.includes(tagName)) selectedTags.push(tagName);
+            label.classList.add('selected');
+          } else {
+            selectedTags = selectedTags.filter(t => t !== tagName);
+            label.classList.remove('selected');
+          }
+        });
+        $tagContainer.appendChild(label);
+      });
+    }
+
+    function showFeedback(msg) {
+      $feedback.textContent = msg;
+      $feedback.style.opacity = '1';
+      setTimeout(() => { $feedback.style.opacity = '0'; }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // WEBSOCKET
+    // ═══════════════════════════════════════════════════════
+    let ws;
+    let reconnectDelay = 1000;
+
+    function connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws/radar`);
+
+      ws.onopen = () => {
+        reconnectDelay = 1000;
+        $status.innerHTML = `
+          <span class="live-dot w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+          <span class="text-emerald-400">Connected</span>`;
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.action === 'comment_augmented' || msg.fb_name) {
+            addCard(msg);
+          }
+        } catch (e) {
+          console.warn('WS parse error:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        $status.innerHTML = `
+          <span class="live-dot w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+          <span class="text-red-400">Disconnected</span>`;
+        setTimeout(connectWS, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    connectWS();
+  </script>
+</body>
+
+</html>

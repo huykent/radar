@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 320px;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 13px;
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #1e1b4b, #312e81);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .version {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* ── Toggle switch ── */
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toggle-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .toggle-label.on {
+            color: #4ade80;
+        }
+
+        .toggle-label.off {
+            color: #f87171;
+        }
+
+        .switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .switch input {
+            display: none;
+        }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            background: #334155;
+            border-radius: 20px;
+            transition: background 200ms;
+        }
+
+        .slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 2px;
+            top: 2px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 200ms;
+        }
+
+        .switch input:checked+.slider {
+            background: #8b5cf6;
+        }
+
+        .switch input:checked+.slider::before {
+            transform: translateX(16px);
+        }
+
+        /* ── Status bar ── */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.connected {
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #f87171;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+
+        /* ── Section ── */
+        .section {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+
+        /* ── Options row ── */
+        .option-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        .option-row label {
+            font-size: 12px;
+            color: #cbd5e1;
+            cursor: pointer;
+        }
+
+        .option-row .mini-switch {
+            position: relative;
+            width: 30px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .option-row .mini-switch input {
+            display: none;
+        }
+
+        .option-row .mini-slider {
+            position: absolute;
+            inset: 0;
+            background: #334155;
+            border-radius: 16px;
+            transition: background 200ms;
+        }
+
+        .option-row .mini-slider::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            left: 2px;
+            top: 2px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 200ms;
+        }
+
+        .option-row .mini-switch input:checked+.mini-slider {
+            background: #8b5cf6;
+        }
+
+        .option-row .mini-switch input:checked+.mini-slider::before {
+            transform: translateX(14px);
+        }
+
+        /* ── Input fields ── */
+        .field {
+            margin-bottom: 8px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .field input {
+            width: 100%;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 12px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            outline: none;
+            transition: border-color 200ms;
+        }
+
+        .field input:focus {
+            border-color: rgba(139, 92, 246, 0.5);
+        }
+
+        .field input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ── Buttons ── */
+        .btn-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 150ms;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
+
+        .btn-save:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-sync {
+            background: rgba(14, 165, 233, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.3);
+        }
+
+        .btn-sync:hover {
+            background: rgba(14, 165, 233, 0.25);
+        }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%) translateY(40px);
+            background: #22c55e;
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 300ms ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ── Footer stats ── */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 14px;
+            font-size: 10px;
+            color: #475569;
+        }
+
+        .footer a {
+            color: #8b5cf6;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <span>📡</span>
+            <div>
+                <h1>Livestream Radar</h1>
+                <span class="version">v3.1.0</span>
+            </div>
+        </div>
+        <div class="toggle-wrap">
+            <span class="toggle-label off" id="toggle-label">TẮT</span>
+            <label class="switch">
+                <input type="checkbox" id="toggle-enabled">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar">
+        <span class="status-dot disconnected" id="status-dot"></span>
+        <span id="status-text">Chưa kết nối</span>
+    </div>
+
+    <!-- Quick Options -->
+    <div class="section">
+        <div class="section-title">⚙️ Tùy chọn</div>
+        <div class="option-row">
+            <label for="opt-badges">Hiện badge trên comment</label>
+            <label class="mini-switch">
+                <input type="checkbox" id="opt-badges" checked>
+                <span class="mini-slider"></span>
+            </label>
+        </div>
+        <div class="option-row">
+            <label for="opt-autoload">Auto-load thêm comments</label>
+            <label class="mini-switch">
+                <input type="checkbox" id="opt-autoload">
+                <span class="mini-slider"></span>
+            </label>
+        </div>
+        <div class="option-row">
+            <label for="opt-junkfilter">Lọc comment rác</label>
+            <label class="mini-switch">
+                <input type="checkbox" id="opt-junkfilter" checked>
+                <span class="mini-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Server Config -->
+    <div class="section">
+        <div class="section-title">🖥️ Server</div>
+        <div class="field">
+            <label>Server URL</label>
+            <input type="text" id="cfg-server-url" placeholder="http://localhost:8000">
+        </div>
+        <div class="field">
+            <label>Radar API Key</label>
+            <input type="password" id="cfg-radar-api-key" placeholder="Để trống nếu chạy local">
+        </div>
+    </div>
+
+    <!-- Pancake POS API -->
+    <div class="section">
+        <div class="section-title">🛒 Pancake POS (Đơn hàng)</div>
+        <div class="field">
+            <label>Shop ID</label>
+            <input type="text" id="cfg-pos-shop-id" placeholder="1942356641">
+        </div>
+        <div class="field">
+            <label>API Key</label>
+            <input type="password" id="cfg-pos-api-key" placeholder="0bc77e30c57b43a3bdbfc14…">
+        </div>
+    </div>
+
+    <!-- Pancake Chat API -->
+    <div class="section">
+        <div class="section-title">💬 Pancake Chat (Tin nhắn)</div>
+        <div class="field">
+            <label>Page ID</label>
+            <input type="text" id="cfg-chat-page-id" placeholder="101763712250113">
+        </div>
+        <div class="field">
+            <label>Page Access Token</label>
+            <input type="password" id="cfg-chat-token" placeholder="EAABsbCS1iHgBO…">
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="section">
+        <div class="btn-row">
+            <button class="btn btn-save" id="btn-save">💾 Lưu cài đặt</button>
+            <button class="btn btn-sync" id="btn-sync">🔄 Sync ngay</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span>Post ID: <span id="footer-post-id">—</span></span>
+        <a href="#" id="footer-dashboard-link" target="_blank">Mở Dashboard ↗</a>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Đã lưu!</div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

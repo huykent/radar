@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+radar.db
+radar.db-wal
+radar.db-shm
+.env
+*.log
+artifacts/
+.gemini/
+CLAUDE.md
+*.png
+*.jpg
+*.webp
