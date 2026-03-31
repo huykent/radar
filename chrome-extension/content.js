@@ -101,9 +101,6 @@
     // ═══════════════════════════════════════════════════════════════
     // STATE
     // ═══════════════════════════════════════════════════════════════
-    let ws = null;
-    let reconnectDelay = RECONNECT_BASE_MS;
-    const commentQueue = [];
     let pendingProfiles = new Map();
     let sentCount = 0;
     let wsConnected = false;
@@ -151,75 +148,27 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // WEBSOCKET
+    // SEND COMMENT VIA BACKGROUND WORKER
     // ═══════════════════════════════════════════════════════════════
-    function connectWS() {
-        // Derive WS URL from serverUrl
-        const wsBase = serverUrl.replace(/^http/, 'ws').replace(/\/+$/, '');
-        WS_URL = `${wsBase}/ws/radar${radarApiKey ? '?api_key=' + encodeURIComponent(radarApiKey) : ''}`;
-
-        try {
-            ws = new WebSocket(WS_URL);
-        } catch (e) {
-            warn('WS create failed:', e);
-            scheduleReconnect();
-            return;
-        }
-
-        ws.onopen = () => {
-            log('✅ Connected to', WS_URL);
-            reconnectDelay = RECONNECT_BASE_MS;
-            wsConnected = true;
-            updateStatus(true, sentCount);
-            while (commentQueue.length) {
-                ws.send(JSON.stringify(commentQueue.shift()));
-            }
-        };
-
-        ws.onmessage = (evt) => {
-            try {
-                const msg = JSON.parse(evt.data);
-                if (msg.action === 'comment_augmented' || msg.tier_tag) {
-                    handleProfile(msg);
-                }
-            } catch (e) {
-                warn('Parse error:', e);
-            }
-        };
-
-        ws.onclose = () => {
-            warn('WebSocket closed. Reconnecting…');
-            wsConnected = false;
-            updateStatus(false, sentCount);
-            scheduleReconnect();
-        };
-
-        ws.onerror = () => ws.close();
-    }
-
-    function scheduleReconnect() {
-        setTimeout(connectWS, reconnectDelay);
-        reconnectDelay = Math.min(reconnectDelay * 1.5, RECONNECT_MAX_MS);
-    }
-
     function sendComment(fbName, text, fbUid) {
         if (!radarEnabled) return;
-        const payload = {
-            action: 'new_comment',
+        chrome.runtime.sendMessage({
+            action: 'send_comment',
             fb_name: fbName,
             text: text,
             fb_uid: fbUid || null,
             post_id: currentPostId || null,
-        };
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(payload));
-        } else {
-            if (commentQueue.length < 200) {
-                commentQueue.push(payload);
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                warn('Send failed:', chrome.runtime.lastError.message);
+                return;
             }
-        }
-        sentCount++;
-        if (wsConnected) updateStatus(true, sentCount);
+            if (response) {
+                sentCount = response.sentCount || sentCount + 1;
+                wsConnected = response.wsConnected || false;
+                updateStatus(wsConnected, sentCount);
+            }
+        });
         log(`💬 Comment: [${fbName}] ${text.substring(0, 60)}… (uid: ${fbUid || 'N/A'})`);
     }
 
@@ -824,55 +773,80 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // MESSAGE LISTENER (for popup + background)
+    // MESSAGE LISTENER (from background worker + popup)
     // ═══════════════════════════════════════════════════════════════
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-        if (msg.action === 'ping') {
-            sendResponse({ status: 'active', sentCount, wsConnected, autoLoadActive });
-            return true;
+        // Background sends augmented comment
+        if (msg.action === 'comment_augmented' || msg.tier_tag) {
+            handleProfile(msg);
+            return;
         }
-        if (msg.action === 'get_status') {
+
+        // Background sends WS status update
+        if (msg.action === 'ws_status') {
+            wsConnected = msg.connected;
+            updateStatus(wsConnected, sentCount);
+            return;
+        }
+
+        // Background sends prefs update
+        if (msg.action === 'prefs_updated') {
+            const s = msg.settings || {};
+            if (typeof s.junkFilter === 'boolean') junkFilterEnabled = s.junkFilter;
+            if (typeof s.showBadges === 'boolean') showBadgesEnabled = s.showBadges;
+            if (typeof s.enabled === 'boolean') radarEnabled = s.enabled;
+            return;
+        }
+
+        // Popup asks for status
+        if (msg.action === 'ping' || msg.action === 'get_status') {
             sendResponse({
+                status: 'active',
+                sentCount,
                 wsConnected,
-                commentCount: sentCount,
                 enabled: radarEnabled,
                 postId: currentPostId,
                 autoLoadActive,
             });
             return true;
         }
+
+        // Popup toggles on/off
         if (msg.action === 'toggle') {
             radarEnabled = !!msg.enabled;
-            if (radarEnabled && !wsConnected) {
-                connectWS();
-            } else if (!radarEnabled && ws) {
-                ws.close();
-            }
             updateStatus(wsConnected, sentCount);
+            // Forward to background
+            chrome.runtime.sendMessage({ action: 'toggle', enabled: radarEnabled });
             sendResponse({ ok: true, enabled: radarEnabled });
             return true;
         }
+
+        // Popup updates settings
         if (msg.action === 'settings_updated') {
             const s = msg.settings || {};
-            if (s.serverUrl) {
-                serverUrl = s.serverUrl;
-                if (ws) ws.close(); // reconnect with new URL
-            }
-            if (s.radarApiKey !== undefined) radarApiKey = s.radarApiKey;
             if (typeof s.junkFilter === 'boolean') junkFilterEnabled = s.junkFilter;
             if (typeof s.showBadges === 'boolean') showBadgesEnabled = s.showBadges;
             if (typeof s.enabled === 'boolean') radarEnabled = s.enabled;
+            // Forward to background for WS reconnect
+            chrome.runtime.sendMessage({ action: 'settings_updated', settings: s });
             sendResponse({ ok: true });
             return true;
         }
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // INIT — Load settings from chrome.storage then start
+    // INIT — Load local prefs then start scanning
     // ═══════════════════════════════════════════════════════════════
     function startRadar() {
-        log('📡 Livestream Radar v3.1 (Chrome Extension + Popup Settings) loaded');
-        connectWS();
+        log('📡 Livestream Radar v3.2 (Background WS) loaded');
+        // Ask background for current WS status
+        chrome.runtime.sendMessage({ action: 'get_ws_status' }, (response) => {
+            if (response) {
+                wsConnected = response.wsConnected;
+                sentCount = response.sentCount || 0;
+                updateStatus(wsConnected, sentCount);
+            }
+        });
         setTimeout(() => {
             scanExistingComments();
             startObserver();
@@ -880,18 +854,14 @@
         }, 3000);
     }
 
-    // Load settings from chrome.storage then init
+    // Load local prefs
     if (typeof chrome !== 'undefined' && chrome.storage) {
         chrome.storage.local.get({
             enabled: true,
-            serverUrl: 'http://localhost:8000',
-            radarApiKey: '',
             junkFilter: true,
             showBadges: true,
         }, (data) => {
             radarEnabled = data.enabled;
-            serverUrl = data.serverUrl || serverUrl;
-            radarApiKey = data.radarApiKey || '';
             junkFilterEnabled = data.junkFilter;
             showBadgesEnabled = data.showBadges;
             if (radarEnabled) {
