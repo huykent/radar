@@ -220,6 +220,49 @@ async def api_sessions():
         return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
 
 
+@app.get("/api/debug/stats", dependencies=[Depends(verify_api_key)])
+async def api_debug_stats():
+    """Debug: show database stats for troubleshooting."""
+    from db import get_db
+    db = await get_db()
+    try:
+        # Count profiles
+        c1 = await db.execute("SELECT COUNT(*) FROM customer_profiles")
+        total = (await c1.fetchone())[0]
+
+        c2 = await db.execute("SELECT COUNT(*) FROM customer_profiles WHERE customer_name IS NOT NULL AND customer_name != ''")
+        with_name = (await c2.fetchone())[0]
+
+        c3 = await db.execute("SELECT COUNT(*) FROM customer_profiles WHERE fb_uid IS NOT NULL AND fb_uid != ''")
+        with_uid = (await c3.fetchone())[0]
+
+        # Sample names
+        c4 = await db.execute("SELECT customer_name, phone, tier_tag, total_orders FROM customer_profiles WHERE customer_name IS NOT NULL LIMIT 10")
+        samples = [dict(r) for r in await c4.fetchall()]
+
+        # Comments count
+        c5 = await db.execute("SELECT COUNT(*) FROM live_comments")
+        comments = (await c5.fetchone())[0]
+
+        # Settings
+        settings = await get_settings()
+
+        return JSONResponse({
+            "profiles_total": total,
+            "profiles_with_name": with_name,
+            "profiles_with_uid": with_uid,
+            "live_comments_total": comments,
+            "sample_profiles": samples,
+            "settings_keys": list(settings.keys()),
+            "has_chat_token": bool(settings.get("pancake_chat_token")),
+            "has_pos_key": bool(settings.get("pancake_api_key")),
+            "last_sync": settings.get("last_sync"),
+            "last_sync_count": settings.get("last_sync_count"),
+        })
+    finally:
+        await db.close()
+
+
 # ═══════════════════════════════════════════════════════════════════
 # SETTINGS API
 # ═══════════════════════════════════════════════════════════════════
