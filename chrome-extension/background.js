@@ -56,22 +56,39 @@ function connectWS() {
     }
 
     ws.onopen = () => {
-        console.log('[Radar BG] ✅ Connected');
-        wsConnected = true;
+        console.log('[Radar BG] ✅ WebSocket opened, authenticating...');
         reconnectDelay = 2000;
 
-        // Flush queued comments
-        while (commentQueue.length > 0) {
-            ws.send(JSON.stringify(commentQueue.shift()));
+        // Send auth message first (query param may be stripped by proxies)
+        if (radarApiKey) {
+            ws.send(JSON.stringify({ action: 'auth', api_key: radarApiKey }));
+        } else {
+            // No key = server is in open mode, ready immediately
+            wsConnected = true;
+            flushQueue();
+            broadcastToTabs({ action: 'ws_status', connected: true });
         }
-
-        // Notify all tabs
-        broadcastToTabs({ action: 'ws_status', connected: true });
     };
 
     ws.onmessage = (evt) => {
         try {
             const msg = JSON.parse(evt.data);
+
+            // Handle auth response
+            if (msg.action === 'auth_ok') {
+                console.log('[Radar BG] ✅ Authenticated');
+                wsConnected = true;
+                flushQueue();
+                broadcastToTabs({ action: 'ws_status', connected: true });
+                return;
+            }
+            if (msg.action === 'auth_fail') {
+                console.error('[Radar BG] ❌ Auth failed:', msg.detail);
+                wsConnected = false;
+                broadcastToTabs({ action: 'ws_status', connected: false, error: msg.detail });
+                return;
+            }
+
             // Forward augmented comments to all Facebook tabs
             broadcastToTabs(msg);
         } catch (e) {
@@ -90,6 +107,12 @@ function connectWS() {
     ws.onerror = () => {
         ws.close();
     };
+}
+
+function flushQueue() {
+    while (commentQueue.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(commentQueue.shift()));
+    }
 }
 
 function scheduleReconnect() {

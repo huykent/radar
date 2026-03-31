@@ -320,18 +320,41 @@ async def api_generate_key():
 async def websocket_radar(ws: WebSocket, api_key: str | None = Query(None)):
     """
     WebSocket endpoint.
-    Receives: {"action": "new_comment", "fb_name": "...", "text": "...", "fb_uid": "..."}
-    Broadcasts: augmented JSON with tier, profile data.
-    Auth: ?api_key=xxx query param (skipped if no key configured).
+    Auth: query param ?api_key=xxx OR first message {"action":"auth","api_key":"xxx"}.
+    Skipped if no key configured on server.
     """
+    await manager.connect(ws)
+
     # ── WebSocket authentication ────────────────────────
     server_key = await _get_api_key()
     if server_key:
-        if not api_key or not secrets.compare_digest(api_key, server_key):
+        authenticated = False
+        # Try query param first
+        if api_key and secrets.compare_digest(api_key, server_key):
+            authenticated = True
+        else:
+            # Wait for auth message (first message within 10s)
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=10)
+                data = json.loads(raw)
+                if data.get("action") == "auth" and data.get("api_key"):
+                    if secrets.compare_digest(data["api_key"], server_key):
+                        authenticated = True
+                        await ws.send_json({"action": "auth_ok"})
+                    else:
+                        await ws.send_json({"action": "auth_fail", "detail": "Invalid API key"})
+                else:
+                    # Not an auth message — might be a comment, reject
+                    await ws.send_json({"action": "auth_fail", "detail": "Auth required"})
+            except (asyncio.TimeoutError, Exception):
+                pass
+
+        if not authenticated:
+            await ws.send_json({"action": "auth_fail", "detail": "Authentication required"})
             await ws.close(code=4001, reason="Invalid API key")
+            manager.disconnect(ws)
             return
 
-    await manager.connect(ws)
     try:
         while True:
             raw = await ws.receive_text()
