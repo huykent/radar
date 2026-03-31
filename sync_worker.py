@@ -413,7 +413,7 @@ async def _fetch_all_customers(
 def _aggregate_orders(orders: list[dict]) -> dict[str, dict]:
     """
     Group orders by normalized phone number and compute aggregates.
-    Returns {phone: {total, success, failed, spent}}.
+    Returns {phone: {total, success, failed, spent, name}}.
     """
     profiles: dict[str, dict] = {}
 
@@ -436,6 +436,7 @@ def _aggregate_orders(orders: list[dict]) -> dict[str, dict]:
                 "success": 0,
                 "failed": 0,
                 "spent": 0.0,
+                "name": "",
             }
 
         p = profiles[phone]
@@ -449,6 +450,14 @@ def _aggregate_orders(orders: list[dict]) -> dict[str, dict]:
             p["spent"] += price
         elif status in FAILED_STATUSES:
             p["failed"] += 1
+
+        # Capture customer name from order
+        if not p["name"]:
+            p["name"] = (
+                order.get("bill_full_name")
+                or order.get("customer_name")
+                or ""
+            )
 
     return profiles
 
@@ -598,7 +607,7 @@ async def _sync_once() -> int:
                 "total_spent": agg["spent"],
                 "tier_tag": tier_tag,
                 "priority_score": priority_score,
-                "customer_name": cust.get("name"),
+                "customer_name": cust.get("name") or agg.get("name") or "",
                 "fb_uid": cust.get("fb_uid"),
                 "pancake_customer_id": cust.get("pancake_customer_id"),
                 "pancake_tags": pancake_tags,
