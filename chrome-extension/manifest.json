@@ -4,7 +4,8 @@
   "version": "3.1.0",
   "description": "Captures Facebook Live comments, sends to Radar backend via WebSocket, and injects tier badges + quick-reply buttons.",
   "permissions": [
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",

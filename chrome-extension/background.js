@@ -228,12 +228,34 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
 });
 
+// ── Keepalive — prevent service worker from sleeping ─────────
+// Chrome MV3 kills service workers after ~30s idle.
+// Alarm fires every 25s to keep it alive + ping WebSocket.
+chrome.alarms.create('radar-keepalive', { periodInMinutes: 0.4 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'radar-keepalive') {
+        // Send WS ping to keep connection alive
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'ping' }));
+        } else if (radarEnabled && !wsConnected) {
+            // Reconnect if dropped
+            connectWS();
+        }
+    }
+});
+
 // ── Lifecycle ────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('[Radar BG] Extension installed:', details.reason);
     if (details.reason === 'install') {
         chrome.storage.local.set(DEFAULTS);
     }
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    console.log('[Radar BG] Browser started');
+    init();
 });
 
 // Init on service worker start
