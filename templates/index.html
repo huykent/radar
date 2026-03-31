@@ -533,6 +533,25 @@
         <p id="cfg-key-status" class="text-[10px] text-gray-600 mt-1"></p>
       </div>
 
+      <!-- ── Pancake Chat ─────────────────────── -->
+      <div class="mt-5 mb-4 pt-4 border-t border-gray-800/50">
+        <h4 class="text-xs font-bold text-purple-400 mb-3">💬 Pancake Chat (Tin nhắn & Tags)</h4>
+        <div class="mb-3">
+          <label class="block text-xs text-gray-400 font-medium mb-1.5">Chat Page ID</label>
+          <input id="cfg-chat-page-id" type="text" class="input-field" placeholder="VD: 101763712250113">
+        </div>
+        <div class="mb-3">
+          <label class="block text-xs text-gray-400 font-medium mb-1.5">Page Access Token</label>
+          <div class="relative">
+            <input id="cfg-chat-token" type="password" class="input-field pr-10" placeholder="Nhập token…">
+            <button id="btn-toggle-chat-token" type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm p-1"
+              title="Hiện/Ẩn">👁️</button>
+          </div>
+          <p id="cfg-chat-status" class="text-[10px] text-gray-600 mt-1"></p>
+        </div>
+      </div>
+
       <!-- Sync Interval -->
       <div class="mb-5">
         <label class="block text-xs text-gray-400 font-medium mb-1.5">Khoảng cách đồng bộ (phút)</label>
@@ -819,6 +838,9 @@
     const $apiKey = document.getElementById('cfg-api-key');
     const $interval = document.getElementById('cfg-interval');
     const $keyStatus = document.getElementById('cfg-key-status');
+    const $chatPageId = document.getElementById('cfg-chat-page-id');
+    const $chatToken = document.getElementById('cfg-chat-token');
+    const $chatStatus = document.getElementById('cfg-chat-status');
     const $syncDot = document.getElementById('sync-dot');
     const $syncText = document.getElementById('sync-text');
     const $syncCust = document.getElementById('sync-customers');
@@ -843,6 +865,10 @@
     document.getElementById('btn-toggle-key').addEventListener('click', () => {
       $apiKey.type = $apiKey.type === 'password' ? 'text' : 'password';
     });
+    // Toggle Chat token visibility
+    document.getElementById('btn-toggle-chat-token').addEventListener('click', () => {
+      $chatToken.type = $chatToken.type === 'password' ? 'text' : 'password';
+    });
 
     // Load settings from API
     async function loadSettings() {
@@ -862,6 +888,19 @@
           $apiKey.placeholder = 'Nhập API key…';
           $keyStatus.textContent = '⚠️ Chưa có API key';
           $keyStatus.className = 'text-[10px] text-amber-500 mt-1';
+        }
+
+        // Chat fields
+        $chatPageId.value = s.pancake_chat_page_id || '';
+        if (s.pancake_chat_token_set) {
+          $chatToken.placeholder = s.pancake_chat_token_masked || '••••••••';
+          $chatToken.value = '';
+          $chatStatus.textContent = '✅ Token đã được lưu';
+          $chatStatus.className = 'text-[10px] text-emerald-500 mt-1';
+        } else {
+          $chatToken.placeholder = 'Nhập token…';
+          $chatStatus.textContent = '⚠️ Chưa có token';
+          $chatStatus.className = 'text-[10px] text-amber-500 mt-1';
         }
 
         // Parse selected tags
@@ -892,11 +931,15 @@
       try {
         const payload = {
           pancake_shop_id: $shopId.value.trim(),
+          pancake_chat_page_id: $chatPageId.value.trim(),
           sync_interval: $interval.value,
           selected_tags: JSON.stringify(selectedTags),
         };
         if ($apiKey.value.trim()) {
           payload.pancake_api_key = $apiKey.value.trim();
+        }
+        if ($chatToken.value.trim()) {
+          payload.pancake_chat_token = $chatToken.value.trim();
         }
 
         const r = await authFetch('/api/settings', {
