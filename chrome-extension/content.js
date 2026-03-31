@@ -84,6 +84,7 @@
     // ═══════════════════════════════════════════════════════════════
     const statusBar = document.createElement('div');
     statusBar.className = 'radar-status-bar';
+    statusBar.style.display = 'none'; // Hidden by default, shown when enabled
     statusBar.innerHTML = `<span class="radar-status-dot radar-status-dot--off"></span> 📡 Radar: connecting…`;
     document.body.appendChild(statusBar);
 
@@ -843,6 +844,7 @@
         // Popup toggles on/off
         if (msg.action === 'toggle') {
             radarEnabled = !!msg.enabled;
+            statusBar.style.display = radarEnabled ? '' : 'none';
             updateStatus(wsConnected, sentCount);
             // Forward to background
             chrome.runtime.sendMessage({ action: 'toggle', enabled: radarEnabled });
@@ -855,7 +857,10 @@
             const s = msg.settings || {};
             if (typeof s.junkFilter === 'boolean') junkFilterEnabled = s.junkFilter;
             if (typeof s.showBadges === 'boolean') showBadgesEnabled = s.showBadges;
-            if (typeof s.enabled === 'boolean') radarEnabled = s.enabled;
+            if (typeof s.enabled === 'boolean') {
+                radarEnabled = s.enabled;
+                statusBar.style.display = radarEnabled ? '' : 'none';
+            }
             // Forward to background for WS reconnect
             chrome.runtime.sendMessage({ action: 'settings_updated', settings: s });
             sendResponse({ ok: true });
@@ -868,6 +873,7 @@
     // ═══════════════════════════════════════════════════════════════
     function startRadar() {
         log('📡 Livestream Radar v3.2 (Background WS) loaded');
+        statusBar.style.display = ''; // Show status bar when active
         // Ask background for current WS status
         chrome.runtime.sendMessage({ action: 'get_ws_status' }, (response) => {
             if (response) {
@@ -897,7 +903,7 @@
                 startRadar();
             } else {
                 log('📡 Radar is disabled via settings');
-                updateStatus(false, 0);
+                statusBar.style.display = 'none'; // Keep hidden when disabled
             }
         });
     } else {
