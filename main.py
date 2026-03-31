@@ -215,20 +215,19 @@ async def logout():
     return response
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def index(request: Request):
     """Serve the Promax Radar Dashboard (protected by login)."""
+    import hashlib
     server_key = await _get_api_key()
     if server_key:
-        import hashlib
         expected = hashlib.sha256(server_key.encode()).hexdigest()[:32]
         session = request.cookies.get("radar_session", "")
         if session != expected:
             return RedirectResponse(url="/login", status_code=303)
     api_key = server_key or ""
     return templates.TemplateResponse(
-        request=request, name="index.html",
-        context={"radar_api_key": api_key}
+        "index.html", {"request": request, "radar_api_key": api_key}
     )
 
 
