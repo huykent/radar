@@ -190,18 +190,23 @@ async def login_page():
     return HTMLResponse(LOGIN_HTML.format(error=""))
 
 
-@app.post("/login", response_class=HTMLResponse)
+@app.post("/login")
 async def login_submit(request: Request):
+    import hashlib
     form = await request.form()
-    password = form.get("password", "")
+    password = str(form.get("password", ""))
     settings = await get_settings()
-    # Check dashboard_password first, then fall back to radar_api_key
-    dash_pass = settings.get("dashboard_password", "")
-    server_key = await _get_api_key()
+    dash_pass = settings.get("dashboard_password", "") or ""
+    server_key = await _get_api_key() or ""
     valid_pass = dash_pass or server_key
 
-    if not valid_pass or secrets.compare_digest(password, valid_pass):
-        import hashlib
+    ok = False
+    if not valid_pass:
+        ok = True
+    elif password and valid_pass and secrets.compare_digest(password, valid_pass):
+        ok = True
+
+    if ok:
         token = hashlib.sha256((valid_pass or "open").encode()).hexdigest()[:32]
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie("radar_session", token, max_age=86400, httponly=True, samesite="lax")
