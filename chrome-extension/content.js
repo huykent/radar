@@ -138,10 +138,39 @@
         const dataId = linkEl.getAttribute('data-id');
         if (dataId && /^\d{5,}$/.test(dataId)) return dataId;
 
-        // Pattern 4: Walk up to find any parent with user ID in data attributes
+        // Pattern 4: Walk up to find any parent with user ID
         const parent = linkEl.closest('[data-actor-id]') || linkEl.closest('[data-uid]');
         if (parent) {
             return parent.getAttribute('data-actor-id') || parent.getAttribute('data-uid');
+        }
+
+        // Pattern 5: data-ft JSON (older Facebook)
+        const ft = linkEl.getAttribute('data-ft') || linkEl.closest('[data-ft]')?.getAttribute('data-ft');
+        if (ft) {
+            try {
+                const ftData = JSON.parse(ft);
+                if (ftData.content_owner_id_new) return String(ftData.content_owner_id_new);
+            } catch { }
+        }
+
+        // Pattern 6: Profile photo URL often has /a.XXXXX or /p{UID}
+        const container = linkEl.closest('[role="article"]') || linkEl.closest('li') || linkEl.parentElement?.parentElement;
+        if (container) {
+            const img = container.querySelector('image[*|href], svg image, img[src*="fbcdn"], img[src*="scontent"]');
+            if (img) {
+                const imgSrc = img.getAttribute('xlink:href') || img.getAttribute('href') || img.src || '';
+                // Facebook CDN profile pics: /v/tXX.X-X/pXXXXXXX... or /a.XXXXX
+                const imgMatch = imgSrc.match(/\/p(\d{10,})/);
+                if (imgMatch) return imgMatch[1];
+            }
+        }
+
+        // Pattern 7: Extract username from href (non-numeric) for cross-referencing
+        // facebook.com/username → store as username for name-based matching
+        const usernameMatch = href.match(/facebook\.com\/([a-zA-Z][a-zA-Z0-9.]{2,})\/?(?:\?|$)/);
+        if (usernameMatch) {
+            // Return as "un:username" so server knows it's a username, not a numeric UID
+            return 'un:' + usernameMatch[1];
         }
 
         return null;
