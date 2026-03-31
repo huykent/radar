@@ -164,7 +164,11 @@ async def verify_api_key(request: Request) -> None:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the Promax Radar Dashboard."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    api_key = await _get_api_key()
+    return templates.TemplateResponse(
+        request=request, name="index.html",
+        context={"radar_api_key": api_key or ""}
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════

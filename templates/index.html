@@ -572,6 +572,14 @@
 
   <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
   <script>
+    // ── API Key for authenticated fetch ─────────────────
+    const RADAR_API_KEY = '{{ radar_api_key }}';
+    function authFetch(url, opts = {}) {
+      opts.headers = opts.headers || {};
+      if (RADAR_API_KEY) opts.headers['X-API-Key'] = RADAR_API_KEY;
+      return fetch(url, opts);
+    }
+
     // ── State ────────────────────────────────────────────
     const state = { total: 0, vip: 0, returning: 0, bomber: 0 };
     const $feed = document.getElementById('comment-feed');
@@ -768,7 +776,7 @@
 
     async function loadSessions() {
       try {
-        const r = await fetch('/api/sessions');
+        const r = await authFetch('/api/sessions');
         const d = await r.json();
         if (d.status === 'ok' && d.sessions) {
           const prevVal = $sessionSelect.value;
@@ -839,7 +847,7 @@
     // Load settings from API
     async function loadSettings() {
       try {
-        const r = await fetch('/api/settings');
+        const r = await authFetch('/api/settings');
         const s = await r.json();
 
         $shopId.value = s.pancake_shop_id || '';
@@ -891,7 +899,7 @@
           payload.pancake_api_key = $apiKey.value.trim();
         }
 
-        const r = await fetch('/api/settings', {
+        const r = await authFetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -918,7 +926,7 @@
       $syncText.textContent = 'Đang đồng bộ…';
 
       try {
-        const r = await fetch('/api/settings/sync-now', { method: 'POST' });
+        const r = await authFetch('/api/settings/sync-now', { method: 'POST' });
         const d = await r.json();
         if (d.status === 'ok') {
           showFeedback(`✅ Đồng bộ thành công! ${d.profiles_synced} khách hàng`);
@@ -945,7 +953,7 @@
       btn.textContent = '⏳ Đang tải…';
 
       try {
-        const r = await fetch('/api/settings/tags');
+        const r = await authFetch('/api/settings/tags');
         const d = await r.json();
         if (d.status === 'ok' && d.tags) {
           renderTags(d.tags);

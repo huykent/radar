@@ -9,7 +9,7 @@ const DEFAULTS = {
     showBadges: true,
     autoLoad: false,
     junkFilter: true,
-    serverUrl: 'http://localhost:8000',
+    serverUrl: 'https://radar.kiwibebe.shop',
     radarApiKey: '',
 };
 
