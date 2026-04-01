@@ -421,8 +421,8 @@ async def webhook_pancake(request: Request):
             await save_webhook_event(event_type, "order", summary, order)
             await _handle_webhook_order(order)
 
-        # ── Conversation / Message events ─────────────────
-        elif event_type in ("message.created", "new_message", "message_created", "conversation.updated", "messaging"):
+        # ── Conversation / Message / Comment events ──────────
+        elif event_type in ("message.created", "new_message", "message_created", "conversation.updated", "messaging", "comment"):
             data_block = body.get("data") or {}
             # Pancake nests: data.message + data.conversation
             msg_obj = data_block.get("message") or {}

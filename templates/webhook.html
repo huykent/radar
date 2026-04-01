@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📩 Webhook Monitor — Livestream Radar</title>
-    <meta name="description" content="Realtime Pancake webhook event monitor">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -20,7 +19,6 @@
             --message: #60a5fa;
             --tag: #a78bfa;
             --customer: #fbbf24;
-            --unknown: #f87171;
         }
 
         * {
@@ -33,356 +31,73 @@
             font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* ── Header ──────────────────────────── */
+        /* ── Header ───────────────────────── */
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 24px;
+            padding: 12px 20px;
             background: rgba(255, 255, 255, 0.02);
             border-bottom: 1px solid var(--border);
-            flex-wrap: wrap;
-            gap: 12px;
+            flex-shrink: 0;
         }
 
         .header-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .header h1 {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             background: linear-gradient(135deg, #818cf8, #c084fc);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .header-sub {
-            font-size: 12px;
-            color: var(--text-dim);
-        }
-
-        .back-link {
-            font-size: 13px;
-            color: var(--accent);
-            text-decoration: none;
-            padding: 6px 14px;
-            border: 1px solid rgba(129, 140, 248, 0.3);
-            border-radius: 8px;
-            transition: all 0.2s;
-        }
-
-        .back-link:hover {
-            background: rgba(129, 140, 248, 0.1);
-        }
-
-        /* ── Stats Bar ──────────────────────── */
-        .stats-bar {
-            display: flex;
-            gap: 12px;
-            padding: 16px 24px;
-            flex-wrap: wrap;
-        }
-
-        .stat-card {
-            flex: 1;
-            min-width: 140px;
-            padding: 14px 18px;
-            border-radius: 12px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-
-        .stat-card:hover {
-            background: var(--surface-hover);
-            transform: translateY(-1px);
-        }
-
-        .stat-card.active {
-            border-color: var(--accent);
-            background: rgba(129, 140, 248, 0.08);
-        }
-
-        .stat-num {
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .stat-label {
             font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
             color: var(--text-dim);
-            margin-top: 4px;
         }
 
-        .stat-card[data-cat="all"] .stat-num {
-            color: var(--accent);
-        }
-
-        .stat-card[data-cat="order"] .stat-num {
-            color: var(--order);
-        }
-
-        .stat-card[data-cat="message"] .stat-num {
-            color: var(--message);
-        }
-
-        .stat-card[data-cat="tag"] .stat-num {
-            color: var(--tag);
-        }
-
-        .stat-card[data-cat="customer"] .stat-num {
-            color: var(--customer);
-        }
-
-        .stat-card[data-cat="unknown"] .stat-num {
-            color: var(--unknown);
-        }
-
-        /* ── Filter buttons ──────────────────── */
-        .filter-bar {
+        .header-actions {
             display: flex;
-            gap: 8px;
-            padding: 0 24px 12px;
-            flex-wrap: wrap;
             align-items: center;
+            gap: 10px;
         }
 
-        .filter-btn {
+        .back-link,
+        .refresh-btn {
             font-size: 12px;
             padding: 6px 14px;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-
-        .filter-btn:hover {
-            background: var(--surface-hover);
-            color: var(--text);
-        }
-
-        .filter-btn.active {
-            background: rgba(129, 140, 248, 0.15);
-            color: var(--accent);
-            border-color: var(--accent);
-        }
-
-        .refresh-btn {
-            margin-left: auto;
-            font-size: 12px;
-            padding: 6px 16px;
             border-radius: 8px;
             border: 1px solid rgba(129, 140, 248, 0.3);
             background: transparent;
             color: var(--accent);
             cursor: pointer;
+            text-decoration: none;
             font-family: inherit;
             transition: all 0.2s;
         }
 
+        .back-link:hover,
         .refresh-btn:hover {
             background: rgba(129, 140, 248, 0.1);
         }
 
-        /* ── Event List ──────────────────────── */
-        .event-list {
-            padding: 0 24px 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .event-card {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 14px 18px;
-            border-radius: 12px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            transition: all 0.2s;
-            cursor: pointer;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .event-card:hover {
-            background: var(--surface-hover);
-        }
-
-        .event-card.expanded {
-            border-color: var(--accent);
-        }
-
-        .event-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            flex-shrink: 0;
-        }
-
-        .event-icon.order {
-            background: rgba(74, 222, 128, 0.12);
-        }
-
-        .event-icon.message {
-            background: rgba(96, 165, 250, 0.12);
-        }
-
-        .event-icon.tag {
-            background: rgba(167, 139, 250, 0.12);
-        }
-
-        .event-icon.customer {
-            background: rgba(251, 191, 36, 0.12);
-        }
-
-        .event-icon.unknown {
-            background: rgba(248, 113, 113, 0.12);
-        }
-
-        .event-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .event-summary {
-            font-size: 13px;
-            font-weight: 500;
-            line-height: 1.4;
-            word-break: break-word;
-        }
-
-        .event-meta {
-            display: flex;
-            gap: 10px;
-            margin-top: 4px;
-            font-size: 11px;
-            color: var(--text-dim);
-        }
-
-        .event-type-badge {
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.06);
-            color: var(--text-dim);
-            font-family: monospace;
-        }
-
-        .event-payload {
-            display: none;
-            margin-top: 10px;
-            padding: 12px;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            font-size: 11px;
-            font-family: 'Courier New', monospace;
-            color: #94a3b8;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .event-card.expanded .event-payload {
-            display: block;
-        }
-
-        .event-time {
-            font-size: 11px;
-            color: var(--text-dim);
-            white-space: nowrap;
-            flex-shrink: 0;
-            padding-top: 2px;
-        }
-
-        /* ── Empty state ──────────────────────── */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-dim);
-        }
-
-        .empty-state span {
-            font-size: 48px;
-            display: block;
-            margin-bottom: 12px;
-        }
-
-        .empty-state p {
-            font-size: 14px;
-        }
-
-        /* ── Loading spinner ─────────────────── */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-dim);
-            font-size: 14px;
-        }
-
-        .loading::after {
-            content: '';
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--accent);
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* ── Auto-refresh indicator ───────────── */
-        .auto-refresh {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            color: var(--text-dim);
-        }
-
-        .pulse-dot {
+        .auto-dot {
             width: 6px;
             height: 6px;
             border-radius: 50%;
             background: var(--order);
+            display: inline-block;
             animation: pulse 2s ease infinite;
         }
 
@@ -397,6 +112,476 @@
                 opacity: 0.3;
             }
         }
+
+        .auto-info {
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* ── Main Layout ──────────────────── */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── Sidebar: Conversations ────── */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-header input {
+            flex: 1;
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-family: inherit;
+            outline: none;
+        }
+
+        .sidebar-header input:focus {
+            border-color: var(--accent);
+        }
+
+        .conv-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .conv-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.15s;
+        }
+
+        .conv-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .conv-item.active {
+            background: rgba(129, 140, 248, 0.1);
+            border-left: 3px solid var(--accent);
+        }
+
+        .conv-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+        }
+
+        .conv-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .conv-name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .conv-snippet {
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+
+        .conv-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+
+        .conv-time {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .conv-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .conv-badge.message {
+            background: rgba(96, 165, 250, 0.2);
+            color: #60a5fa;
+        }
+
+        .conv-badge.order {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .conv-badge.tag {
+            background: rgba(167, 139, 250, 0.2);
+            color: #a78bfa;
+        }
+
+        .conv-badge.mixed {
+            background: rgba(129, 140, 248, 0.2);
+            color: #818cf8;
+        }
+
+        /* ── Stats chips ──────────────────── */
+        .stats-chips {
+            display: flex;
+            gap: 6px;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .chip:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        .chip.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(129, 140, 248, 0.1);
+        }
+
+        .chip b {
+            font-weight: 700;
+        }
+
+        /* ── Chat Panel ───────────────────── */
+        .chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chat-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .chat-header-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+        }
+
+        .chat-header-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .chat-header-sub {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ── Chat Bubbles ─────────────────── */
+        .msg-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .msg-row {
+            display: flex;
+            gap: 8px;
+            max-width: 75%;
+            animation: fadeUp 0.25s ease;
+        }
+
+        .msg-row.incoming {
+            align-self: flex-start;
+        }
+
+        .msg-row.system {
+            align-self: center;
+            max-width: 90%;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            margin-top: auto;
+        }
+
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 13px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .bubble.incoming {
+            background: rgba(255, 255, 255, 0.08);
+            border-bottom-left-radius: 6px;
+        }
+
+        .bubble-sender {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--message);
+            margin-bottom: 2px;
+        }
+
+        .bubble-time {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 3px;
+            text-align: right;
+        }
+
+        /* ── System message (order/tag/customer) ── */
+        .system-card {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            border: 1px solid;
+            width: 100%;
+        }
+
+        .system-card.order {
+            background: rgba(74, 222, 128, 0.06);
+            border-color: rgba(74, 222, 128, 0.15);
+        }
+
+        .system-card.tag {
+            background: rgba(167, 139, 250, 0.06);
+            border-color: rgba(167, 139, 250, 0.15);
+        }
+
+        .system-card.customer {
+            background: rgba(251, 191, 36, 0.06);
+            border-color: rgba(251, 191, 36, 0.15);
+        }
+
+        .system-card.unknown {
+            background: rgba(248, 113, 113, 0.06);
+            border-color: rgba(248, 113, 113, 0.15);
+        }
+
+        .system-icon {
+            font-size: 18px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .system-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .system-detail {
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .system-time {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* ── Order card detail ────────────── */
+        .order-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 12px;
+            margin-top: 6px;
+            font-size: 11px;
+        }
+
+        .order-field-label {
+            color: var(--text-dim);
+        }
+
+        .order-field-value {
+            font-weight: 500;
+        }
+
+        /* ── Payload toggle ───────────────── */
+        .payload-toggle {
+            font-size: 10px;
+            color: var(--accent);
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 6px;
+            border: none;
+            background: none;
+            font-family: inherit;
+            padding: 0;
+        }
+
+        .payload-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .payload-content {
+            display: none;
+            margin-top: 6px;
+            padding: 8px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 10px;
+            font-family: monospace;
+            color: #94a3b8;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .payload-content.show {
+            display: block;
+        }
+
+        /* ── Empty / Loading ──────────────── */
+        .empty-chat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            color: var(--text-dim);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-chat span {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-chat p {
+            font-size: 13px;
+        }
+
+        .empty-chat code {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+            display: inline-block;
+        }
+
+        /* ── Timestamp divider ────────────── */
+        .time-divider {
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-dim);
+            padding: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .time-divider::before,
+        .time-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
     </style>
 </head>
 
@@ -406,172 +591,393 @@
     <!-- Header -->
     <div class="header">
         <div class="header-left">
-            <span style="font-size:28px">📩</span>
+            <span style="font-size:24px">📩</span>
             <div>
                 <h1>Webhook Monitor</h1>
                 <span class="header-sub">Pancake Real-time Events</span>
             </div>
         </div>
-        <div style="display:flex; align-items:center; gap:12px;">
-            <div class="auto-refresh">
-                <span class="pulse-dot"></span>
-                Auto-refresh: <span id="countdown">30</span>s
+        <div class="header-actions">
+            <div class="auto-info">
+                <span class="auto-dot"></span>
+                <span id="countdown">30</span>s
             </div>
+            <button class="refresh-btn" onclick="loadEvents()">🔄 Refresh</button>
             <a href="/" class="back-link">← Dashboard</a>
         </div>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-bar">
-        <div class="stat-card active" data-cat="all" onclick="filterCategory('all')">
-            <div class="stat-num" id="stat-total">0</div>
-            <div class="stat-label">Tổng Events</div>
+    <div class="main-layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="stats-chips">
+                <div class="chip active" data-cat="all" onclick="filterCat('all')">Tất cả <b id="s-total">0</b></div>
+                <div class="chip" data-cat="message" onclick="filterCat('message')">💬 <b id="s-msg">0</b></div>
+                <div class="chip" data-cat="order" onclick="filterCat('order')">📦 <b id="s-ord">0</b></div>
+                <div class="chip" data-cat="tag" onclick="filterCat('tag')">🏷️ <b id="s-tag">0</b></div>
+                <div class="chip" data-cat="customer" onclick="filterCat('customer')">👤 <b id="s-cust">0</b></div>
+            </div>
+            <div class="sidebar-header">
+                <input type="text" id="search-conv" placeholder="🔍 Tìm kiếm…" oninput="filterConvs()">
+            </div>
+            <div class="conv-list" id="conv-list">
+                <!-- Populated by JS -->
+            </div>
         </div>
-        <div class="stat-card" data-cat="order" onclick="filterCategory('order')">
-            <div class="stat-num" id="stat-order">0</div>
-            <div class="stat-label">📦 Đơn Hàng</div>
-        </div>
-        <div class="stat-card" data-cat="message" onclick="filterCategory('message')">
-            <div class="stat-num" id="stat-message">0</div>
-            <div class="stat-label">💬 Tin Nhắn</div>
-        </div>
-        <div class="stat-card" data-cat="tag" onclick="filterCategory('tag')">
-            <div class="stat-num" id="stat-tag">0</div>
-            <div class="stat-label">🏷️ Gắn Thẻ</div>
-        </div>
-        <div class="stat-card" data-cat="customer" onclick="filterCategory('customer')">
-            <div class="stat-num" id="stat-customer">0</div>
-            <div class="stat-label">👤 Khách Hàng</div>
-        </div>
-        <div class="stat-card" data-cat="unknown" onclick="filterCategory('unknown')">
-            <div class="stat-num" id="stat-unknown">0</div>
-            <div class="stat-label">❓ Khác</div>
-        </div>
-    </div>
 
-    <!-- Filter -->
-    <div class="filter-bar">
-        <button class="filter-btn active" data-cat="all" onclick="filterCategory('all')">Tất cả</button>
-        <button class="filter-btn" data-cat="order" onclick="filterCategory('order')">📦 Đơn hàng</button>
-        <button class="filter-btn" data-cat="message" onclick="filterCategory('message')">💬 Tin nhắn</button>
-        <button class="filter-btn" data-cat="tag" onclick="filterCategory('tag')">🏷️ Gắn thẻ</button>
-        <button class="filter-btn" data-cat="customer" onclick="filterCategory('customer')">👤 Khách hàng</button>
-        <button class="filter-btn" data-cat="unknown" onclick="filterCategory('unknown')">❓ Khác</button>
-        <button class="refresh-btn" onclick="loadEvents()">🔄 Refresh</button>
-    </div>
-
-    <!-- Event List -->
-    <div id="event-list" class="event-list">
-        <div class="loading">Đang tải webhook events</div>
+        <!-- Chat Panel -->
+        <div class="chat-panel">
+            <div class="chat-header" id="chat-header" style="display:none;">
+                <div class="chat-header-avatar" id="ch-avatar">?</div>
+                <div>
+                    <div class="chat-header-name" id="ch-name">—</div>
+                    <div class="chat-header-sub" id="ch-sub">—</div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="empty-chat" id="chat-empty">
+                    <span>📭</span>
+                    <p>Chọn cuộc hội thoại bên trái hoặc chờ webhook data từ Pancake</p>
+                    <code>https://radar.kiwibebe.shop/webhook/pancake</code>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         const API_KEY = document.getElementById('radar-api-key').value;
+        let allEvents = [];
         let currentCat = 'all';
-        let refreshTimer = null;
-        let countdownTimer = null;
+        let selectedConv = null; // null = show all
         let countdownVal = 30;
-
-        const ICONS = {
-            order: '📦', message: '💬', tag: '🏷️', customer: '👤', unknown: '❓',
-        };
+        let countdownTimer = null;
 
         function authFetch(url) {
             return fetch(url, { headers: { 'X-API-Key': API_KEY } });
         }
-
         function escHtml(s) {
-            const d = document.createElement('div');
-            d.textContent = s;
-            return d.innerHTML;
+            const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
         }
-
+        function stripHtml(s) { return s.replace(/<[^>]+>/g, '').trim(); }
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.trim().split(/\s+/);
+            return parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+        }
         function fmtTime(ts) {
             if (!ts) return '';
             const d = new Date(ts);
-            return d.toLocaleString('vi-VN', {
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                day: '2-digit', month: '2-digit',
+            return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        }
+        function fmtDate(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+        function fmtFull(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit' });
+        }
+
+        // ── Extract conversation key from event ──
+        function getConvKey(ev) {
+            try {
+                const p = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+                // Messages: data.conversation.id or data.message.conversation_id
+                if (p.conversation) return p.conversation.id || '';
+                if (p.message) return p.message.conversation_id || '';
+                if (p.conversation_id) return p.conversation_id;
+                // Orders: phone or customer name
+                if (ev.category === 'order') {
+                    const phone = p.bill_phone_number || p.customer_phone || '';
+                    const name = p.bill_full_name || p.customer_name || '';
+                    return `order:${phone || name || 'unknown'}`;
+                }
+                // Customers
+                if (ev.category === 'customer') {
+                    const phone = p.phone_number || p.phone || '';
+                    return `customer:${phone || 'unknown'}`;
+                }
+            } catch { }
+            return `other:${ev.id}`;
+        }
+
+        function getSenderName(ev) {
+            try {
+                const p = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+                if (p.message && p.message.from) return p.message.from.name || '';
+                if (p.conversation && p.conversation.from) return p.conversation.from.name || '';
+                if (p.from) return p.from.name || '';
+                if (ev.category === 'order') return p.bill_full_name || p.customer_name || '';
+                if (ev.category === 'customer') return p.name || p.full_name || '';
+            } catch { }
+            return ev.summary?.split(':')[0]?.replace(/[📦💬🏷️👤❓]/g, '').trim() || 'Unknown';
+        }
+
+        function getMessageText(ev) {
+            try {
+                const p = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+                if (p.message) return stripHtml(p.message.original_message || p.message.message || '');
+                if (p.conversation) return p.conversation.snippet || '';
+            } catch { }
+            return '';
+        }
+
+        // ── Build conversations from events ──
+        function buildConversations(events) {
+            const convMap = new Map();
+
+            events.forEach(ev => {
+                const key = getConvKey(ev);
+                if (!convMap.has(key)) {
+                    convMap.set(key, {
+                        key,
+                        name: getSenderName(ev),
+                        events: [],
+                        lastTime: ev.created_at,
+                        categories: new Set(),
+                    });
+                }
+                const conv = convMap.get(key);
+                conv.events.push(ev);
+                conv.categories.add(ev.category);
+                if (ev.created_at > conv.lastTime) {
+                    conv.lastTime = ev.created_at;
+                    conv.name = getSenderName(ev) || conv.name;
+                }
+            });
+
+            return Array.from(convMap.values()).sort((a, b) =>
+                new Date(b.lastTime) - new Date(a.lastTime)
+            );
+        }
+
+        // ── Render sidebar ──
+        function renderSidebar(conversations) {
+            const list = document.getElementById('conv-list');
+            const search = document.getElementById('search-conv').value.toLowerCase();
+            list.innerHTML = '';
+
+            // "All" option
+            const allItem = document.createElement('div');
+            allItem.className = `conv-item${selectedConv === null ? ' active' : ''}`;
+            allItem.onclick = () => { selectedConv = null; renderAll(); };
+            const totalEvents = conversations.reduce((s, c) => s + c.events.length, 0);
+            allItem.innerHTML = `
+        <div class="conv-avatar" style="background:linear-gradient(135deg,#818cf8,#c084fc)">📩</div>
+        <div class="conv-info">
+          <div class="conv-name">Tất cả sự kiện</div>
+          <div class="conv-snippet">${totalEvents} events từ Pancake</div>
+        </div>`;
+            list.appendChild(allItem);
+
+            conversations.forEach(conv => {
+                if (search && !conv.name.toLowerCase().includes(search)) return;
+
+                const item = document.createElement('div');
+                item.className = `conv-item${selectedConv === conv.key ? ' active' : ''}`;
+                item.onclick = () => { selectedConv = conv.key; renderAll(); };
+
+                const initials = getInitials(conv.name);
+                const snippet = conv.events[0]?.summary?.replace(/^[📦💬🏷️👤❓]\s*/, '') || '';
+                const mainCat = conv.categories.size > 1 ? 'mixed' :
+                    conv.categories.values().next().value;
+
+                item.innerHTML = `
+          <div class="conv-avatar">${initials}</div>
+          <div class="conv-info">
+            <div class="conv-name">${escHtml(conv.name || 'Unknown')}</div>
+            <div class="conv-snippet">${escHtml(snippet.substring(0, 50))}</div>
+          </div>
+          <div class="conv-meta">
+            <span class="conv-time">${fmtTime(conv.lastTime)}</span>
+            <span class="conv-badge ${mainCat}">${conv.events.length}</span>
+          </div>`;
+                list.appendChild(item);
             });
         }
 
-        function renderEvent(ev) {
-            const icon = ICONS[ev.category] || '❓';
-            const card = document.createElement('div');
-            card.className = 'event-card';
-            card.onclick = function () { this.classList.toggle('expanded'); };
+        // ── Render chat messages ──
+        function renderChat(events) {
+            const container = document.getElementById('chat-messages');
+            const header = document.getElementById('chat-header');
+            const empty = document.getElementById('chat-empty');
 
-            let payloadStr = '';
-            try {
-                const obj = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
-                payloadStr = JSON.stringify(obj, null, 2);
-            } catch { payloadStr = ev.payload || '{}'; }
-
-            card.innerHTML = `
-        <div class="event-icon ${ev.category}">${icon}</div>
-        <div class="event-body">
-          <div class="event-summary">${escHtml(ev.summary || '')}</div>
-          <div class="event-meta">
-            <span class="event-type-badge">${escHtml(ev.event_type || '')}</span>
-            <span>${fmtTime(ev.created_at)}</span>
-          </div>
-          <div class="event-payload">${escHtml(payloadStr)}</div>
-        </div>
-        <span class="event-time">${fmtTime(ev.created_at)}</span>
-      `;
-            return card;
-        }
-
-        async function loadEvents() {
-            const list = document.getElementById('event-list');
-            const catParam = currentCat === 'all' ? '' : `&category=${currentCat}`;
-
-            try {
-                const r = await authFetch(`/api/webhook-events?limit=200${catParam}`);
-                const d = await r.json();
-
-                if (d.status === 'ok') {
-                    // Update stats
-                    const stats = d.stats || {};
-                    document.getElementById('stat-total').textContent = stats.total || 0;
-                    document.getElementById('stat-order').textContent = stats.order || 0;
-                    document.getElementById('stat-message').textContent = stats.message || 0;
-                    document.getElementById('stat-tag').textContent = stats.tag || 0;
-                    document.getElementById('stat-customer').textContent = stats.customer || 0;
-                    document.getElementById('stat-unknown').textContent = stats.unknown || 0;
-
-                    // Render events
-                    list.innerHTML = '';
-                    if (!d.events || d.events.length === 0) {
-                        list.innerHTML = `
-              <div class="empty-state">
-                <span>📭</span>
-                <p>Chưa có webhook event nào${currentCat !== 'all' ? ' trong nhóm này' : ''}.</p>
-                <p style="margin-top:8px; font-size:12px; color:#475569;">
-                  Webhook URL: <code style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px;">https://radar.kiwibebe.shop/webhook/pancake</code>
-                </p>
-              </div>`;
-                        return;
-                    }
-
-                    d.events.forEach(ev => {
-                        list.appendChild(renderEvent(ev));
-                    });
-                }
-            } catch (e) {
-                list.innerHTML = `<div class="empty-state"><span>⚠️</span><p>Lỗi tải dữ liệu: ${escHtml(e.message)}</p></div>`;
+            if (!events || events.length === 0) {
+                container.innerHTML = '';
+                container.appendChild(empty);
+                empty.style.display = '';
+                header.style.display = 'none';
+                return;
             }
 
-            // Reset countdown
-            resetCountdown();
+            header.style.display = 'flex';
+            if (empty) empty.style.display = 'none';
+
+            // Show header for selected conversation
+            if (selectedConv) {
+                const firstName = getSenderName(events[0]);
+                document.getElementById('ch-avatar').textContent = getInitials(firstName);
+                document.getElementById('ch-name').textContent = firstName || 'Unknown';
+                document.getElementById('ch-sub').textContent = `${events.length} events`;
+            } else {
+                document.getElementById('ch-avatar').textContent = '📩';
+                document.getElementById('ch-name').textContent = 'Tất cả sự kiện';
+                document.getElementById('ch-sub').textContent = `${events.length} events`;
+            }
+
+            // Sort chronologically (oldest first)
+            const sorted = [...events].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+            container.innerHTML = '';
+            let lastDate = '';
+
+            sorted.forEach(ev => {
+                // Date divider
+                const evDate = fmtDate(ev.created_at);
+                if (evDate !== lastDate) {
+                    lastDate = evDate;
+                    const divider = document.createElement('div');
+                    divider.className = 'time-divider';
+                    divider.textContent = evDate;
+                    container.appendChild(divider);
+                }
+
+                if (ev.category === 'message') {
+                    container.appendChild(renderMessageBubble(ev));
+                } else {
+                    container.appendChild(renderSystemCard(ev));
+                }
+            });
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
         }
 
-        function filterCategory(cat) {
+        function renderMessageBubble(ev) {
+            const row = document.createElement('div');
+            row.className = 'msg-row incoming';
+
+            const name = getSenderName(ev);
+            const text = getMessageText(ev) || ev.summary?.replace(/^💬\s*/, '').replace(/\[INBOX\]/, '').trim() || '';
+            const payloadStr = getPayloadStr(ev);
+
+            row.innerHTML = `
+        <div class="msg-avatar">${getInitials(name)}</div>
+        <div>
+          <div class="bubble incoming">
+            <div class="bubble-sender">${escHtml(name)}</div>
+            <div>${escHtml(text)}</div>
+            <div class="bubble-time">${fmtFull(ev.created_at)}</div>
+          </div>
+          <button class="payload-toggle" onclick="this.nextElementSibling.classList.toggle('show')">▸ Xem raw data</button>
+          <div class="payload-content">${escHtml(payloadStr)}</div>
+        </div>`;
+            return row;
+        }
+
+        function renderSystemCard(ev) {
+            const row = document.createElement('div');
+            row.className = 'msg-row system';
+
+            const icons = { order: '📦', tag: '🏷️', customer: '👤', unknown: '❓' };
+            const titles = { order: 'Đơn hàng', tag: 'Gắn thẻ', customer: 'Khách hàng', unknown: 'Sự kiện' };
+            const icon = icons[ev.category] || '❓';
+            const title = titles[ev.category] || 'Sự kiện';
+            const payloadStr = getPayloadStr(ev);
+
+            let detailHtml = '';
+            try {
+                const p = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+                if (ev.category === 'order') {
+                    const name = p.bill_full_name || p.customer_name || '';
+                    const phone = p.bill_phone_number || p.customer_phone || '';
+                    const status = p.status || '';
+                    const price = parseFloat(p.total_price || 0);
+                    detailHtml = `
+            <div class="order-fields">
+              <span class="order-field-label">Khách:</span>
+              <span class="order-field-value">${escHtml(name)}</span>
+              <span class="order-field-label">SĐT:</span>
+              <span class="order-field-value">${escHtml(phone)}</span>
+              <span class="order-field-label">Trạng thái:</span>
+              <span class="order-field-value">${escHtml(String(status))}</span>
+              <span class="order-field-label">Giá trị:</span>
+              <span class="order-field-value" style="color:var(--order);font-weight:600">${price.toLocaleString('vi-VN')}đ</span>
+            </div>`;
+                } else if (ev.category === 'tag') {
+                    detailHtml = `<div class="system-detail">${escHtml(ev.summary || '')}</div>`;
+                } else if (ev.category === 'customer') {
+                    detailHtml = `<div class="system-detail">${escHtml(ev.summary || '')}</div>`;
+                } else {
+                    detailHtml = `<div class="system-detail">${escHtml(ev.summary || '')}</div>`;
+                }
+            } catch {
+                detailHtml = `<div class="system-detail">${escHtml(ev.summary || '')}</div>`;
+            }
+
+            row.innerHTML = `
+        <div class="system-card ${ev.category}">
+          <div class="system-title"><span class="system-icon">${icon}</span>${title}</div>
+          ${detailHtml}
+          <div class="system-time">${fmtFull(ev.created_at)} · ${escHtml(ev.event_type || '')}</div>
+          <button class="payload-toggle" onclick="this.nextElementSibling.classList.toggle('show')">▸ Xem raw data</button>
+          <div class="payload-content">${escHtml(payloadStr)}</div>
+        </div>`;
+            return row;
+        }
+
+        function getPayloadStr(ev) {
+            try {
+                const obj = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+                return JSON.stringify(obj, null, 2);
+            } catch { return ev.payload || '{}'; }
+        }
+
+        // ── Filter ──
+        function filterCat(cat) {
             currentCat = cat;
-            // Update active states
-            document.querySelectorAll('.stat-card').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
-            loadEvents();
+            document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+            renderAll();
+        }
+        function filterConvs() { renderAll(); }
+
+        // ── Main render ──
+        function renderAll() {
+            let filtered = allEvents;
+            if (currentCat !== 'all') {
+                filtered = filtered.filter(e => e.category === currentCat);
+            }
+
+            const convs = buildConversations(filtered);
+            renderSidebar(convs);
+
+            if (selectedConv) {
+                const conv = convs.find(c => c.key === selectedConv);
+                renderChat(conv ? conv.events : []);
+            } else {
+                renderChat(filtered);
+            }
+        }
+
+        // ── Load ──
+        async function loadEvents() {
+            try {
+                const r = await authFetch('/api/webhook-events?limit=500');
+                const d = await r.json();
+                if (d.status === 'ok') {
+                    allEvents = d.events || [];
+                    const stats = d.stats || {};
+                    document.getElementById('s-total').textContent = stats.total || 0;
+                    document.getElementById('s-msg').textContent = stats.message || 0;
+                    document.getElementById('s-ord').textContent = stats.order || 0;
+                    document.getElementById('s-tag').textContent = stats.tag || 0;
+                    document.getElementById('s-cust').textContent = stats.customer || 0;
+                    renderAll();
+                }
+            } catch (e) { console.error('Load error:', e); }
+            resetCountdown();
         }
 
         function resetCountdown() {
@@ -581,13 +987,10 @@
             countdownTimer = setInterval(() => {
                 countdownVal--;
                 document.getElementById('countdown').textContent = countdownVal;
-                if (countdownVal <= 0) {
-                    loadEvents();
-                }
+                if (countdownVal <= 0) loadEvents();
             }, 1000);
         }
 
-        // Initial load
         loadEvents();
     </script>
 </body>
