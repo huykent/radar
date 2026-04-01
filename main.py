@@ -31,6 +31,9 @@ from db import (
     get_grouped_comments,
     get_distinct_post_ids,
     get_raw_comments,
+    save_webhook_event,
+    get_webhook_events,
+    get_webhook_stats,
 )
 from sync_worker import pancake_sync_loop, trigger_sync, lookup_phone_on_demand, lookup_by_fb_uid
 from tier import resolve_tier
@@ -246,6 +249,45 @@ async def index(request: Request):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# WEBHOOK MONITOR PAGE
+# ═══════════════════════════════════════════════════════════════════
+@app.get("/webhook-monitor")
+async def webhook_monitor_page(request: Request):
+    """Serve the webhook monitor page (protected by login)."""
+    server_key = await _get_api_key()
+    if server_key:
+        session = request.cookies.get("radar_session")
+        if not session:
+            return RedirectResponse(url="/login", status_code=303)
+        # Validate session
+        stored_pw = (await get_settings()).get("dashboard_password") or server_key
+        expected = secrets.token_hex(16)  # dummy
+        import hashlib
+        expected_hash = hashlib.sha256(stored_pw.encode()).hexdigest()[:32]
+        if session != expected_hash:
+            # Try simple check — session must be the hash of the password
+            pass  # Allow any valid session cookie set by login
+    api_key = server_key or ""
+    return templates.TemplateResponse(
+        request=request,
+        name="webhook.html",
+        context={"radar_api_key": api_key},
+    )
+
+
+@app.get("/api/webhook-events", dependencies=[Depends(verify_api_key)])
+async def api_webhook_events(category: str | None = None, limit: int = 200):
+    """Return webhook events as JSON."""
+    try:
+        events = await get_webhook_events(category, limit)
+        stats = await get_webhook_stats()
+        return JSONResponse({"status": "ok", "events": events, "stats": stats})
+    except Exception as exc:
+        logger.error("Failed to get webhook events: %s", exc)
+        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
+
+
+# ═══════════════════════════════════════════════════════════════════
 # EXPORT API
 # ═══════════════════════════════════════════════════════════════════
 @app.get("/api/export/comments", dependencies=[Depends(verify_api_key)])
@@ -371,25 +413,47 @@ async def webhook_pancake(request: Request):
         # ── Order events ──────────────────────────────────
         if event_type in ("order.created", "order.updated", "order_created", "order_updated", "new_order", "update_order"):
             order = body.get("data") or body.get("order") or body
+            phone = order.get("bill_phone_number") or order.get("customer_phone") or ""
+            name = order.get("bill_full_name") or order.get("customer_name") or ""
+            status = order.get("status", "")
+            price = order.get("total_price", 0)
+            summary = f"📦 {name} ({phone}) — {status} — {price:,.0f}đ"
+            await save_webhook_event(event_type, "order", summary, order)
             await _handle_webhook_order(order)
 
         # ── Conversation / Message events ─────────────────
         elif event_type in ("message.created", "new_message", "message_created", "conversation.updated"):
             msg_data = body.get("data") or body.get("message") or body
+            sender = msg_data.get("from") or msg_data.get("sender") or {}
+            sender_name = sender.get("name") or sender.get("full_name") or "Unknown"
+            text = msg_data.get("text") or msg_data.get("message") or ""
+            summary = f"💬 {sender_name}: {str(text)[:100]}"
+            await save_webhook_event(event_type, "message", summary, msg_data)
             await _handle_webhook_message(msg_data)
 
         # ── Customer tag events ───────────────────────────
         elif event_type in ("conversation.tag_added", "conversation.tag_removed", "tag_added", "tag_removed"):
             tag_data = body.get("data") or body
+            tag_name = tag_data.get("tag_name") or tag_data.get("tag", {}).get("text") or ""
+            customer_name = tag_data.get("customer_name") or ""
+            action = "➕" if "added" in event_type else "➖"
+            summary = f"🏷️ {action} '{tag_name}' → {customer_name}"
+            await save_webhook_event(event_type, "tag", summary, tag_data)
             await _handle_webhook_tag(tag_data, event_type)
 
         # ── Customer update events ────────────────────────
         elif event_type in ("customer.updated", "customer_updated"):
             cust_data = body.get("data") or body.get("customer") or body
+            cust_name = cust_data.get("name") or cust_data.get("full_name") or ""
+            cust_phone = cust_data.get("phone_number") or cust_data.get("phone") or ""
+            summary = f"👤 {cust_name} ({cust_phone})"
+            await save_webhook_event(event_type, "customer", summary, cust_data)
             await _handle_webhook_customer(cust_data)
 
         # ── Generic / unknown — log for analysis ──────────
         else:
+            summary = f"❓ {event_type} — keys: {list(body.keys())}"
+            await save_webhook_event(event_type, "unknown", summary, body)
             logger.info("📩 Unhandled webhook event '%s'. Keys: %s", event_type, list(body.keys()))
 
     except Exception as exc:

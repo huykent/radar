@@ -106,6 +106,25 @@ async def init_db() -> None:
         except Exception:
             pass
 
+        # ── Webhook events table ─────────────────────────────
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'unknown',
+                summary TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_webhook_events_category ON webhook_events(category)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_webhook_events_created ON webhook_events(created_at)"
+        )
+        await db.commit()
+
     finally:
         await db.close()
 
@@ -417,5 +436,75 @@ async def get_raw_comments(post_id: str | None = None, limit: int = 500) -> list
             )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def save_webhook_event(
+    event_type: str, category: str, summary: str, payload: dict
+) -> None:
+    """Save a webhook event for the monitor page."""
+    db = await get_db()
+    try:
+        await db.execute(
+            """
+            INSERT INTO webhook_events (event_type, category, summary, payload)
+            VALUES (?, ?, ?, ?)
+            """,
+            (event_type, category, summary, json.dumps(payload, ensure_ascii=False)),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_webhook_events(
+    category: str | None = None, limit: int = 200
+) -> list[dict]:
+    """Return webhook events, optionally filtered by category."""
+    db = await get_db()
+    try:
+        if category:
+            cursor = await db.execute(
+                """
+                SELECT id, event_type, category, summary, payload, created_at
+                FROM webhook_events
+                WHERE category = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (category, limit),
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT id, event_type, category, summary, payload, created_at
+                FROM webhook_events
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def get_webhook_stats() -> dict:
+    """Return count of webhook events by category."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("""
+            SELECT category, COUNT(*) as cnt
+            FROM webhook_events
+            GROUP BY category
+        """)
+        rows = await cursor.fetchall()
+        stats = {row["category"]: row["cnt"] for row in rows}
+        cursor2 = await db.execute("SELECT COUNT(*) as total FROM webhook_events")
+        total_row = await cursor2.fetchone()
+        stats["total"] = total_row["total"] if total_row else 0
+        return stats
     finally:
         await db.close()
