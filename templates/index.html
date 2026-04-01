@@ -831,15 +831,65 @@
       } catch (e) { console.warn('Load sessions failed:', e); }
     }
 
-    $sessionSelect.addEventListener('change', () => {
+    $sessionSelect.addEventListener('change', async () => {
       const pid = $sessionSelect.value;
       const btn = $exportPost;
       if (pid) {
         btn.disabled = false;
         btn.style.opacity = '1';
+        // Fetch and render stored comments for this session
+        try {
+          const r = await authFetch(`/api/comments?post_id=${encodeURIComponent(pid)}`);
+          const d = await r.json();
+          if (d.status === 'ok' && d.comments) {
+            // Clear feed and reset stats
+            $feed.innerHTML = '';
+            state.total = 0; state.vip = 0; state.returning = 0; state.bomber = 0;
+            $total.textContent = '0'; $vip.textContent = '0'; $return.textContent = '0'; $bomber.textContent = '0';
+
+            // Render in chronological order (oldest first, prepend = newest on top)
+            const sorted = d.comments.reverse();
+            sorted.forEach(c => {
+              const msg = {
+                fb_name: c.fb_name || 'Unknown',
+                text: c.text || '',
+                tier_tag: c.tier_tag || '⚪ KHÁCH MỚI',
+                phone: c.phone || '',
+                fb_uid: c.fb_uid || '',
+                total_spent: 0,
+                success_orders: 0,
+                failed_orders: 0,
+                match_method: '',
+                pancake_tags: [],
+                _time: c.created_at,
+              };
+              addCard(msg);
+            });
+            // Override time display with actual stored time
+            const cards = $feed.querySelectorAll('[data-tier]');
+            const times = sorted.map(c => {
+              if (!c.created_at) return '';
+              const d = new Date(c.created_at);
+              return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            });
+            cards.forEach((card, i) => {
+              const timeEl = card.querySelector('.text-gray-600.whitespace-nowrap');
+              if (timeEl && times[i]) timeEl.textContent = times[i];
+            });
+          }
+        } catch (e) { console.warn('Load session comments failed:', e); }
       } else {
         btn.disabled = true;
         btn.style.opacity = '0.4';
+        // Back to live mode — clear and show empty state
+        $feed.innerHTML = '';
+        state.total = 0; state.vip = 0; state.returning = 0; state.bomber = 0;
+        $total.textContent = '0'; $vip.textContent = '0'; $return.textContent = '0'; $bomber.textContent = '0';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.id = 'empty-state';
+        emptyDiv.className = 'flex flex-col items-center justify-center h-full text-gray-600';
+        emptyDiv.innerHTML = '<span class="text-5xl mb-3">📡</span><p class="text-sm">Waiting for live comments…</p>';
+        $feed.appendChild(emptyDiv);
       }
     });
 

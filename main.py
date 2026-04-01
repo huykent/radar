@@ -30,6 +30,7 @@ from db import (
     get_all_unique_tags,
     get_grouped_comments,
     get_distinct_post_ids,
+    get_raw_comments,
 )
 from sync_worker import pancake_sync_loop, trigger_sync, lookup_phone_on_demand, lookup_by_fb_uid
 from tier import resolve_tier
@@ -290,6 +291,17 @@ async def api_sessions():
         return JSONResponse({"status": "ok", "sessions": sessions})
     except Exception as exc:
         logger.error("Failed to get sessions: %s", exc)
+        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
+
+
+@app.get("/api/comments", dependencies=[Depends(verify_api_key)])
+async def api_comments(post_id: str | None = None, limit: int = 500):
+    """Return individual comments as JSON for dashboard rendering."""
+    try:
+        comments = await get_raw_comments(post_id, limit)
+        return JSONResponse({"status": "ok", "comments": comments})
+    except Exception as exc:
+        logger.error("Failed to get comments: %s", exc)
         return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
 
 

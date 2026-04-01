@@ -388,3 +388,34 @@ async def get_distinct_post_ids() -> list[dict]:
         return [dict(row) for row in rows]
     finally:
         await db.close()
+
+
+async def get_raw_comments(post_id: str | None = None, limit: int = 500) -> list[dict]:
+    """Return individual comments (not grouped) for a session, ordered by time."""
+    db = await get_db()
+    try:
+        if post_id:
+            cursor = await db.execute(
+                """
+                SELECT fb_name, phone, text, tier_tag, priority_score, fb_uid, post_id, created_at
+                FROM live_comments
+                WHERE post_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (post_id, limit),
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT fb_name, phone, text, tier_tag, priority_score, fb_uid, post_id, created_at
+                FROM live_comments
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
