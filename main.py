@@ -412,22 +412,35 @@ async def webhook_pancake(request: Request):
 
     # POS order status mapping
     POS_STATUS_MAP = {
-        0: "Mới", 1: "Xác nhận", 2: "Đang giao", 3: "Hoàn",
+        0: "Mới", 1: "Xác nhận", 2: "Đang giao", 3: "Hoàn thành",
         4: "Hủy", 5: "Thành công", 6: "Đã thu tiền",
+        7: "Trả hàng", 8: "Đang vận chuyển", 9: "Đã nhận",
+    }
+    POS_STATUS_NAME_MAP = {
+        "new": "Mới", "submitted": "Xác nhận", "delivering": "Đang giao",
+        "delivered": "Hoàn thành", "canceled": "Hủy", "success": "Thành công",
+        "collected_money": "Đã thu tiền", "returned": "Trả hàng",
     }
 
     try:
-        # ── Order events (POS: type="orders" OR Chat: order.created etc) ──
-        if body_type == "orders" or event_type in (
+        # ── Determine if this is a POS event by checking the 'type' field ──
+        is_pos_order = body_type == "orders"
+        is_pos_product = body_type in ("variations_warehouses", "products", "variations")
+        is_pos_customer = body_type == "customers"
+        is_pos_post = body_type in ("post", "posts")
+
+        # ── Order events ──────────────────────────────────
+        if is_pos_order or (event_type in (
             "order.created", "order.updated", "order_created", "order_updated",
-            "new_order", "update_order", "create", "update",
-        ) and body.get("bill_phone_number"):
+            "new_order", "update_order",
+        )):
             # POS sends data at top level, Chat nests under data
             order = body if body.get("bill_phone_number") else (body.get("data") or body.get("order") or body)
             phone = order.get("bill_phone_number") or order.get("customer_phone") or ""
             name = order.get("bill_full_name") or order.get("customer_name") or ""
             raw_status = order.get("status", "")
-            status_name = order.get("status_name") or POS_STATUS_MAP.get(raw_status, str(raw_status))
+            raw_status_name = str(order.get("status_name", "")).lower()
+            status_label = POS_STATUS_NAME_MAP.get(raw_status_name) or POS_STATUS_MAP.get(raw_status, str(raw_status))
             price = float(order.get("total_price", 0) or 0)
             # Product info
             items = order.get("items") or []
@@ -440,29 +453,46 @@ async def webhook_pancake(request: Request):
                 if pname:
                     product_names.append(f"{pname} ({detail}) x{qty}" if detail else f"{pname} x{qty}")
             products_str = ", ".join(product_names) if product_names else ""
+            addr = ""
+            ship = order.get("shipping_address") or {}
+            if ship.get("full_address"):
+                addr = ship["full_address"]
 
-            evt_label = f"{'create' if event_type in ('create', 'order.created', 'order_created', 'new_order') else 'update'}"
-            summary = f"📦 {name} ({phone}) — {status_name} — {price:,.0f}đ"
+            evt_label = "create" if event_type in ("create", "order.created", "order_created", "new_order") else "update"
+            summary = f"📦 {name} ({phone}) — {status_label} — {price:,.0f}đ"
             if products_str:
                 summary += f" | {products_str}"
             await save_webhook_event(f"order.{evt_label}", "order", summary, order)
             await _handle_webhook_order(order)
 
+        # ── POS product/inventory events (just log, don't process) ──
+        elif is_pos_product:
+            summary = f"📦 Cập nhật kho/sản phẩm (type={body_type})"
+            await save_webhook_event(f"pos.{body_type}", "product", summary, body)
+
+        # ── POS customer events ───────────────────────────
+        elif is_pos_customer:
+            cust_data = body if body.get("name") else (body.get("data") or body.get("customer") or body)
+            cust_name = cust_data.get("name") or cust_data.get("full_name") or ""
+            phones = cust_data.get("phone_numbers") or []
+            cust_phone = phones[0] if phones else (cust_data.get("phone_number") or "")
+            summary = f"👤 {cust_name} ({cust_phone})"
+            await save_webhook_event(f"pos.customer.{event_type}", "customer", summary, cust_data)
+
+        # ── POS post events ───────────────────────────────
+        elif is_pos_post:
+            summary = f"📝 Bài viết (type={body_type}, event={event_type})"
+            await save_webhook_event(f"pos.{body_type}", "post", summary, body)
+
         # ── Conversation / Message / Comment events ──────────
         elif event_type in ("message.created", "new_message", "message_created", "conversation.updated", "messaging", "comment"):
             data_block = body.get("data") or {}
-            # Pancake nests: data.message + data.conversation
             msg_obj = data_block.get("message") or {}
             conv_obj = data_block.get("conversation") or {}
-            msg_data = data_block if not msg_obj else data_block
 
-            # Extract sender from message.from or conversation.from
             sender = msg_obj.get("from") or conv_obj.get("from") or data_block.get("from") or data_block.get("sender") or {}
             sender_name = sender.get("name") or sender.get("full_name") or "Unknown"
-            sender_id = str(sender.get("id") or sender.get("psid") or "")
-            # Extract text
             text = msg_obj.get("original_message") or msg_obj.get("message") or conv_obj.get("snippet") or data_block.get("text") or ""
-            # Strip HTML tags
             import re
             text = re.sub(r'<[^>]+>', '', str(text)).strip()
             conv_type = msg_obj.get("type") or conv_obj.get("type") or ""
@@ -492,9 +522,9 @@ async def webhook_pancake(request: Request):
 
         # ── Generic / unknown — log for analysis ──────────
         else:
-            summary = f"❓ {event_type} — keys: {list(body.keys())}"
+            summary = f"❓ {event_type} (type={body_type}) — keys: {list(body.keys())[:8]}"
             await save_webhook_event(event_type, "unknown", summary, body)
-            logger.info("📩 Unhandled webhook event '%s'. Keys: %s", event_type, list(body.keys()))
+            logger.info("📩 Unhandled webhook event '%s' type='%s'. Keys: %s", event_type, body_type, list(body.keys()))
 
     except Exception as exc:
         logger.exception("Webhook processing error: %s", exc)
