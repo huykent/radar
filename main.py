@@ -406,19 +406,46 @@ async def webhook_pancake(request: Request):
         return JSONResponse({"status": "error", "detail": "Invalid JSON"}, status_code=400)
 
     event_type = body.get("event_type") or body.get("event") or body.get("type") or body.get("action") or "unknown"
-    logger.info("📩 Webhook received: %s", event_type)
+    body_type = body.get("type", "")  # POS sends type="orders" separately
+    logger.info("📩 Webhook received: event_type=%s, type=%s", event_type, body_type)
     logger.debug("Webhook payload: %s", json.dumps(body, ensure_ascii=False)[:500])
 
+    # POS order status mapping
+    POS_STATUS_MAP = {
+        0: "Mới", 1: "Xác nhận", 2: "Đang giao", 3: "Hoàn",
+        4: "Hủy", 5: "Thành công", 6: "Đã thu tiền",
+    }
+
     try:
-        # ── Order events ──────────────────────────────────
-        if event_type in ("order.created", "order.updated", "order_created", "order_updated", "new_order", "update_order"):
-            order = body.get("data") or body.get("order") or body
+        # ── Order events (POS: type="orders" OR Chat: order.created etc) ──
+        if body_type == "orders" or event_type in (
+            "order.created", "order.updated", "order_created", "order_updated",
+            "new_order", "update_order", "create", "update",
+        ) and body.get("bill_phone_number"):
+            # POS sends data at top level, Chat nests under data
+            order = body if body.get("bill_phone_number") else (body.get("data") or body.get("order") or body)
             phone = order.get("bill_phone_number") or order.get("customer_phone") or ""
             name = order.get("bill_full_name") or order.get("customer_name") or ""
-            status = order.get("status", "")
-            price = order.get("total_price", 0)
-            summary = f"📦 {name} ({phone}) — {status} — {price:,.0f}đ"
-            await save_webhook_event(event_type, "order", summary, order)
+            raw_status = order.get("status", "")
+            status_name = order.get("status_name") or POS_STATUS_MAP.get(raw_status, str(raw_status))
+            price = float(order.get("total_price", 0) or 0)
+            # Product info
+            items = order.get("items") or []
+            product_names = []
+            for item in items[:3]:
+                vi = item.get("variation_info") or {}
+                pname = vi.get("name", "")
+                detail = vi.get("detail", "")
+                qty = item.get("quantity", 1)
+                if pname:
+                    product_names.append(f"{pname} ({detail}) x{qty}" if detail else f"{pname} x{qty}")
+            products_str = ", ".join(product_names) if product_names else ""
+
+            evt_label = f"{'create' if event_type in ('create', 'order.created', 'order_created', 'new_order') else 'update'}"
+            summary = f"📦 {name} ({phone}) — {status_name} — {price:,.0f}đ"
+            if products_str:
+                summary += f" | {products_str}"
+            await save_webhook_event(f"order.{evt_label}", "order", summary, order)
             await _handle_webhook_order(order)
 
         # ── Conversation / Message / Comment events ──────────
@@ -487,6 +514,7 @@ async def _handle_webhook_order(order: dict):
 
     customer_name = order.get("bill_full_name") or order.get("customer_name") or ""
     status = str(order.get("status", "")).lower().strip()
+    status_name = str(order.get("status_name", "")).lower().strip()
     price = float(order.get("total_price", 0) or 0)
 
     # Get existing profile or create new
@@ -505,10 +533,10 @@ async def _handle_webhook_order(order: dict):
     SUCCESS = {"success", "delivered", "done", "collected_money", "5", "6"}
     FAILED = {"returned", "canceled", "failed", "customer_cancel", "3", "4"}
 
-    if status in SUCCESS:
+    if status in SUCCESS or status_name in SUCCESS:
         success += 1
         spent += price
-    elif status in FAILED:
+    elif status in FAILED or status_name in FAILED:
         failed += 1
 
     tier_tag, priority_score = resolve_tier(
