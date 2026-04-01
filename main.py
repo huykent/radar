@@ -405,7 +405,7 @@ async def webhook_pancake(request: Request):
     except Exception:
         return JSONResponse({"status": "error", "detail": "Invalid JSON"}, status_code=400)
 
-    event_type = body.get("event") or body.get("type") or body.get("action") or "unknown"
+    event_type = body.get("event_type") or body.get("event") or body.get("type") or body.get("action") or "unknown"
     logger.info("📩 Webhook received: %s", event_type)
     logger.debug("Webhook payload: %s", json.dumps(body, ensure_ascii=False)[:500])
 
@@ -422,14 +422,27 @@ async def webhook_pancake(request: Request):
             await _handle_webhook_order(order)
 
         # ── Conversation / Message events ─────────────────
-        elif event_type in ("message.created", "new_message", "message_created", "conversation.updated"):
-            msg_data = body.get("data") or body.get("message") or body
-            sender = msg_data.get("from") or msg_data.get("sender") or {}
+        elif event_type in ("message.created", "new_message", "message_created", "conversation.updated", "messaging"):
+            data_block = body.get("data") or {}
+            # Pancake nests: data.message + data.conversation
+            msg_obj = data_block.get("message") or {}
+            conv_obj = data_block.get("conversation") or {}
+            msg_data = data_block if not msg_obj else data_block
+
+            # Extract sender from message.from or conversation.from
+            sender = msg_obj.get("from") or conv_obj.get("from") or data_block.get("from") or data_block.get("sender") or {}
             sender_name = sender.get("name") or sender.get("full_name") or "Unknown"
-            text = msg_data.get("text") or msg_data.get("message") or ""
-            summary = f"💬 {sender_name}: {str(text)[:100]}"
-            await save_webhook_event(event_type, "message", summary, msg_data)
-            await _handle_webhook_message(msg_data)
+            sender_id = str(sender.get("id") or sender.get("psid") or "")
+            # Extract text
+            text = msg_obj.get("original_message") or msg_obj.get("message") or conv_obj.get("snippet") or data_block.get("text") or ""
+            # Strip HTML tags
+            import re
+            text = re.sub(r'<[^>]+>', '', str(text)).strip()
+            conv_type = msg_obj.get("type") or conv_obj.get("type") or ""
+
+            summary = f"💬 {sender_name}: {text[:100]}" + (f" [{conv_type}]" if conv_type else "")
+            await save_webhook_event(event_type, "message", summary, data_block)
+            await _handle_webhook_message(data_block)
 
         # ── Customer tag events ───────────────────────────
         elif event_type in ("conversation.tag_added", "conversation.tag_removed", "tag_added", "tag_removed"):
